@@ -1,16 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { CartContext } from '../context/CartContext';
+import axios from 'axios';
 
 const Payment = () => {
   const location = useLocation();
   const product = location.state?.product; // Retrieve product data from Cart
+  const { cart } = useContext(CartContext);
+  const [quantity, setQuantity] = useState(product.quantity || 1);
   const [step, setStep] = useState(1);
   const [userDetails, setUserDetails] = useState({
     name: '',
     email: '',
     phoneNumber: '',
-    address: '',  
-  }); 
+    address: '',
+  });
+  const [userAddresses, setUserAddresses] = useState([]);
+  const [cartItems, setCartItems] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [cardDetails, setCardDetails] = useState({
     cardNumber: '',
@@ -22,7 +28,65 @@ const Payment = () => {
     error: '',
   });
   const [confirmation, setConfirmation] = useState(false);
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountError, setDiscountError] = useState("");
+  const [discountApplied, setDiscountApplied] = useState(false);
+  const [discountedPrice, setDiscountedPrice] = useState(product?.originalPrice || 0);
+  const [discountAmount, setDiscountAmount] = useState(0);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const loggedInUser = localStorage.getItem('user');
+      if (!loggedInUser) return;
+
+      try {
+        const parsedUser = JSON.parse(loggedInUser);
+        const userId = parsedUser?._id;
+
+        if (!userId) return;
+
+        const userResponse = await axios.get(`http://localhost:5000/api/users/${userId}`);
+        const userData = userResponse.data;
+
+        const addressResponse = await axios.get(`http://localhost:5000/api/users/${userId}/addresses`);
+        const addresses = addressResponse.data;
+        // console.log('User addresses:', addresses);
+
+        setUserDetails((prev) => ({
+          ...prev,
+          name: userData?.name || '',
+          email: userData?.email || '',
+          phoneNumber: userData?.phoneNumber || '',
+          address: addresses?.length > 0
+            ? {
+              line1: addresses[0].line1 || '',
+              line2: addresses[0].line2 || '',
+              city: addresses[0].city || '',
+              state: addresses[0].state || '',
+              zip: addresses[0].zip || ''
+            }
+            : { line1: '', line2: '', city: '', state: '', zip: '' },
+        }));
+
+        setUserAddresses(Array.isArray(addresses) ? addresses : []);
+      } catch (error) {
+        console.error('Error fetching user details:', error);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  useEffect(() => {
+    // If the product is from the cart, update the quantity from the cart
+    if (Array.isArray(cartItems) && cartItems.length > 0) {
+      const cartProduct = cart.find((item) => item._id === product._id);
+      if (cartProduct) {
+        setQuantity(cartProduct.quantity);
+      }
+    }
+  }, [cart, product]);
 
   const handleNextStep = () => {
     if (step === 1) {
@@ -52,7 +116,7 @@ const Payment = () => {
       alert('All user details are required.');
       return;
     }
-  
+
     if (!paymentMethod) {
       alert('Please select a payment method.');
       return;
@@ -68,11 +132,11 @@ const Payment = () => {
     const parsedUser = loggedInUserId ? JSON.parse(loggedInUserId) : null;
     console.log('Parsed user:', parsedUser);
 
-    const userWithUserId = { 
-      ...userDetails, 
-      userId: parsedUser ? parsedUser._id : null 
+    const userWithUserId = {
+      ...userDetails,
+      userId: parsedUser ? parsedUser._id : null
     };
-    
+
     if (!userWithUserId.userId) {
       alert('User is not logged in or userId is missing.');
       return;
@@ -96,10 +160,10 @@ const Payment = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000${apiUrl}`,{
+      const response = await fetch(`http://localhost:5000${apiUrl}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderDetails: { product, userDetails: userWithUserId } })
+        body: JSON.stringify({ orderDetails: { product, userDetails: userWithUserId, quantity, } })
       });
       console.log('Sending data:', { product, userDetails: userWithUserId });
 
@@ -117,12 +181,44 @@ const Payment = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setUserDetails((prevDetails) => ({ ...prevDetails, [name]: value }));
+    setUserDetails((prev) => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        [name]: value,  // Update the specific field in the address object
+      },
+    }));
   };
 
   const handleCardChange = (e) => {
     const { name, value } = e.target;
     setCardDetails((prevDetails) => ({ ...prevDetails, [name]: value }));
+  };
+
+  const handleQuantityChange = (e) => {
+    const newQuantity = parseInt(e.target.value, 10);
+    setQuantity(newQuantity > 0 ? newQuantity : 1);
+  };
+
+  // Function to apply discount dynamically
+  const applyDiscount = () => {
+    if (discountCode.trim() === "") {
+      setDiscountError("Please enter a discount code.");
+      setDiscountApplied(false);
+      return;
+    }
+
+    // Define random discount values dynamically
+    const discountAmounts = [250, 500, 1000,]; // Add more values if needed
+    const randomDiscount = discountAmounts[Math.floor(Math.random() * discountAmounts.length)];
+
+    // Ensure the final price never goes below zero
+    const newPrice = Math.max(product.originalPrice - randomDiscount, 0);
+
+    setDiscountedPrice(newPrice);
+    setDiscountAmount(randomDiscount);
+    setDiscountApplied(true);
+    setDiscountError("");
   };
 
   return (
@@ -148,9 +244,23 @@ const Payment = () => {
           </h3>
           <p>{product.description}</p>
           <p className="font-semibold">
-            Price: ${product?.price ? product.price.toFixed(2) 
-            : (product?.totalPrice ? product.totalPrice.toFixed(2) : 'N/A')}
+            Price: ${discountApplied ? discountedPrice.toFixed(2) : (product.finalPrice * quantity).toFixed(2)}
           </p>
+          {discountApplied && (
+            <p className="text-green-400">Discount Applied: ₹{discountAmount} off 🎉</p>
+          )}
+          {/* {console.log(product)} */}
+          {/* Quantity Display */}
+          <label className="block mt-3">
+            <span className="font-semibold">Quantity:</span>
+            <input
+              type="number"
+              value={quantity}
+              onChange={handleQuantityChange}
+              className="w-16 ml-2 text-center border border-gray-500 rounded bg-gray-700 text-white"
+              min="1"
+            />
+          </label>
         </div>
       )}
 
@@ -158,7 +268,7 @@ const Payment = () => {
       {step === 1 && (
         <div>
           <h3 className="text-xl font-semibold mb-4">Enter Your Details</h3>
-          {['name', 'email', 'phoneNumber', 'address'].map((field) => (
+          {['name', 'email', 'phoneNumber'].map((field) => (
             <input
               key={field}
               type={field === 'email' ? 'email' : 'text'}
@@ -169,6 +279,25 @@ const Payment = () => {
               className="p-2 border border-gray-500 rounded w-full mb-2 text-black"
             />
           ))}
+
+          {/* Separate inputs for each address field */}
+          {['line1', 'line2', 'city', 'state', 'zip'].map((field) => (
+            <div key={field} className="mb-4">
+              <label htmlFor={field} className="block text-sm font-medium text-white">
+                {field.charAt(0).toUpperCase() + field.slice(1)}
+              </label>
+              <input
+                id={field}
+                type="text"
+                name={field}
+                value={userDetails.address?.[field] || ''}
+                onChange={(e) => handleChange({ target: { name: field, value: e.target.value } })}
+                placeholder={`Enter your ${field}`}
+                className="p-2 border border-gray-500 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+              />
+            </div>
+          ))}
+
           <button onClick={handleNextStep} className="bg-blue-500 text-white p-2 rounded w-full mt-4">
             Next
           </button>
@@ -222,6 +351,32 @@ const Payment = () => {
               />
             </div>
           )}
+
+          {/* Discount Code Section */}
+          <div className="mt-4">
+            <h3 className="text-xl font-semibold mb-2">Apply Discount Code</h3>
+            <input
+              type="text"
+              value={discountCode}
+              onChange={(e) => setDiscountCode(e.target.value)}
+              placeholder="Enter discount code"
+              className="p-2 border border-gray-500 rounded w-full text-black"
+            />
+            <button
+              onClick={applyDiscount}
+              disabled={discountApplied} // Disable button after applying discount
+              className="bg-green-500 hover:bg-green-600 text-white p-2 rounded w-full mt-2"
+            >
+              {discountApplied ? "Discount Applied" : "Apply Discount"}
+            </button>
+            {discountError && <p className="text-red-400 mt-2">{discountError}</p>}
+            {discountApplied && (
+              <p className="text-green-400 mt-2">
+                Discount Applied! ₹{product.originalPrice - discountedPrice} off 🎉 New Price: ₹{discountedPrice.toFixed(2)}
+              </p>
+            )}
+          </div>
+
 
           <div className="flex justify-between">
             <button onClick={handlePreviousStep} className="bg-gray-500 text-white p-2 rounded w-1/3">

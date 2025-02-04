@@ -55,6 +55,8 @@ const AdminPanel = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenforLocation, setIsOpenforLocation] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [selectedOrders, setSelectedOrders] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Filter products based on the search term
   const filteredPreBuiltPCs = (products || []).filter(
@@ -76,6 +78,11 @@ const AdminPanel = () => {
       product.type === 'Mini PC' &&
       (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  // Filter orders based on the search query
+  const filteredOrders = orders.filter(order =>
+    order._id.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   useEffect(() => {
@@ -137,9 +144,9 @@ const AdminPanel = () => {
   }, []);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchProducts = async (page = 1, limit = 10) => {
       try {
-        const response = await fetch("http://localhost:5000/api/admin/products", {
+        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
@@ -208,7 +215,7 @@ const AdminPanel = () => {
       }
     };
 
-    fetchProducts();
+    fetchProducts(1, 10);
     fetchUsers();
     fetchPendingOrders();
     fetchData();
@@ -527,6 +534,9 @@ const AdminPanel = () => {
       formData.customId = `${Date.now()}${Math.floor(Math.random() * 10000)}`; // Generate a unique customId
       console.log("Generated customId:", formData.customId);  // Log generated customId for debugging
     }
+
+    // Ensure stock is converted properly
+    formData.stock = formData.stock === "no" ? false : true;
 
     // Append fields
     Object.keys(formData).forEach((key) => {
@@ -939,8 +949,79 @@ const AdminPanel = () => {
 
   const toggleBox1 = () => setIsOpenforLocation((prev) => !prev);
 
+  const handleDeletedeviceinformation = async () => {
+    try {
+      // Make a DELETE request to the backend to delete all device information
+      const response = await fetch('http://localhost:5000/api/admin/device-info', { method: 'DELETE' });
+
+      if (response.ok) {
+        // If the deletion is successful, update the state to clear device info
+        setDeviceInfo([]);  // Clear the device info from the frontend
+        alert('All device information has been deleted.');
+      } else {
+        const errorData = await response.json();
+        alert('Error: ' + errorData.message);
+      }
+    } catch (error) {
+      console.error('Error deleting device information:', error);
+      alert('Failed to delete device information.');
+    }
+  };
+
+  const handleDeletelocationinformation = async () => {
+    try {
+      // Make a DELETE request to the backend to delete all location information
+      const response = await fetch('http://localhost:5000/api/admin/location-info', { method: 'DELETE' });
+
+      if (response.ok) {
+        // If the deletion is successful, update the state to clear location info
+        setLocationInfo([]);  // Clear the location info from the frontend
+        alert('All location information has been deleted.');
+      } else {
+        const errorData = await response.json();
+        alert('Error: ' + errorData.message);
+      }
+    } catch (error) {
+      console.error('Error deleting location information:', error);
+      alert('Failed to delete location information.');
+    }
+  }
+
   const toggleHistory = () => {
     setIsCollapsed((prev) => !prev);
+  };
+
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrders((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedOrders.length === 0) {
+      alert("Please select orders to delete.");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:5000/api/admin/orders/delete", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ orderIds: selectedOrders }),
+      });
+
+      if (response.ok) {
+        alert("Orders deleted successfully!");
+        setOrders((prevOrders) => prevOrders.filter((order) => !selectedOrders.includes(order._id)));
+        setSelectedOrders([]); // Clear selection
+      } else {
+        alert("Failed to delete orders.");
+      }
+    } catch (error) {
+      console.error("Error deleting orders:", error);
+    }
   };
 
   return (
@@ -1049,108 +1130,137 @@ const AdminPanel = () => {
             {/* Pending Orders Section */}
             <section className="mb-6">
               <h2 className="text-2xl font-semibold mb-4">Pending Orders</h2>
+
               {error && <p className="error text-red-500">{error}</p>}
               <div className="bg-gray-800 p-6 rounded-md shadow-md">
-                {orders && orders.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-gray-300">
-                      <thead className="bg-gray-700">
-                        <tr>
-                          <th className="py-2 px-4">Order ID</th>
-                          <th className="py-2 px-4">Product Details</th>
-                          <th className="py-2 px-4">User Details</th>
-                          <th className="py-2 px-4">Payment Method</th>
-                          <th className="py-2 px-4">Price (₹)</th>
-                          <th className="py-2 px-4">Order Date</th>
-                          <th className="py-2 px-4">Delivery Date</th>
-                          <th className="py-2 px-4">Status</th>
-                          <th className="py-2 px-4 text-center">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orders.map((order) => (
-                          <tr key={order._id} className="bg-gray-700 hover:bg-gray-600 transition">
-                            {/* Order ID */}
-                            <td className="py-2 px-4">{order._id}</td>
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search by Order ID"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-gray-700 text-gray-300 py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {filteredOrders.length > 0 ? (
+                  <>
+                    <button
+                      onClick={handleDeleteSelected}
+                      className="mb-4 py-2 px-4 bg-red-500 text-gray-900 rounded-md hover:bg-red-600 transition"
+                    >
+                      Delete Selected Orders
+                    </button>
 
-                            {/* Product Details */}
-                            <td className="py-2 px-4">
-                              <div>
-                                <p className="font-semibold">{order.product.name}</p>
-                                <p className="text-sm text-gray-400">{order.product.description}</p>
-                                <p className="text-sm text-gray-400">Category: {order.product.category}</p>
-                              </div>
-                            </td>
-
-                            {/* User Details */}
-                            <td className="py-2 px-4">
-                              <div>
-                                <p>Name: {order.userDetails.name}</p>
-                                <p>Email: {order.userDetails.email}</p>
-                                <p>Phone: {order.userDetails.phoneNumber}</p>
-                                <p className="text-sm text-gray-400">
-                                  Address: {order.userDetails.address}
-                                </p>
-                              </div>
-                            </td>
-
-                            {/* Payment Method */}
-                            <td className="py-2 px-4">{order.paymentMethod}</td>
-
-                            {/* Product Price */}
-                            <td className="py-2 px-4">₹{order.product.price}</td>
-
-                            {/* Order Date */}
-                            <td className="py-2 px-4">{new Date(order.date).toLocaleDateString()}</td>
-
-                            {/* Editable Delivery Date */}
-                            <td className="py-2 px-4">
-                              <input
-                                type="date"
-                                value={order.deliveryDate && !isNaN(new Date(order.deliveryDate).getTime())
-                                  ? new Date(order.deliveryDate).toISOString().split('T')[0] // Format date for the date input
-                                  : ""
-                                } // Format date for the date input
-                                onChange={(e) => updateDeliveryDate(order._id, e.target.value)}
-                                className="bg-gray-800 text-gray-300 py-1 px-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </td>
-
-                            {/* Status */}
-                            <td className="py-2 px-4">
-                              <select
-                                value={order.status}
-                                onChange={(e) => updateOrderStatus(order._id, e.target.value)}
-                                className="bg-gray-800 text-gray-300 py-1 px-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              >
-                                <option value="Pending">Pending</option>
-                                <option value="Processing">Processing</option>
-                                <option value="Shipped">Shipped</option>
-                                <option value="Delivered">Delivered</option>
-                                <option value="Cancelled">Cancelled</option>
-                              </select>
-                            </td>
-
-                            {/* Actions */}
-                            <td className="py-2 px-4 text-center space-x-2">
-                              <button
-                                onClick={() => updateOrderState(order._id, 'confirmed')}
-                                className="py-1 px-3 bg-green-500 text-gray-900 rounded-md hover:bg-green-600 transition"
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => updateOrderState(order._id, 'cancelled')}
-                                className="py-1 px-3 bg-red-500 text-gray-900 rounded-md hover:bg-red-600 transition"
-                              >
-                                Cancel
-                              </button>
-                            </td>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-gray-300">
+                        <thead className="bg-gray-700">
+                          <tr>
+                            <th className="py-2 px-4">Select</th>
+                            <th className="py-2 px-4">Order ID</th>
+                            <th className="py-2 px-4">Product Details</th>
+                            <th className="py-2 px-4">User Details</th>
+                            <th className="py-2 px-4">Payment Method</th>
+                            <th className="py-2 px-4">Final Price (₹)</th>
+                            <th className="py-2 px-4">Order Date</th>
+                            <th className="py-2 px-4">Delivery Date</th>
+                            <th className="py-2 px-4">Status</th>
+                            <th className="py-2 px-4 text-center">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {filteredOrders.map((order) => (
+                            <tr key={order._id} className="bg-gray-700 hover:bg-gray-600 transition">
+                              {/* Select Checkbox */}
+                              <td className="py-2 px-4 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedOrders.includes(order._id)}
+                                  onChange={() => handleSelectOrder(order._id)}
+                                  className="w-5 h-5"
+                                />
+                              </td>
+
+                              {/* Order ID */}
+                              <td className="py-2 px-4 text-sm">{order._id}</td>
+
+                              {/* Product Details */}
+                              <td className="py-2 px-4">
+                                <div>
+                                  <p className="font-semibold">{order.product.name}</p>
+                                  <p className="text-sm text-gray-400">Code: {order.product.code}</p>
+                                </div>
+                              </td>
+
+                              {/* User Details */}
+                              <td className="py-2 px-4">
+                                <div>
+                                  <p>Name: {order.userDetails.name}</p>
+                                  <p>Email: {order.userDetails.email}</p>
+                                  <p>Phone: {order.userDetails.phoneNumber}</p>
+                                  <p className="text-sm text-gray-400">
+                                    Address: {`${order.userDetails.address.line1}, ${order.userDetails.address.line2}, ${order.userDetails.address.city}, ${order.userDetails.address.state}, ${order.userDetails.address.zip}`}
+                                  </p>
+                                </div>
+                              </td>
+
+                              {/* Payment Method */}
+                              <td className="py-2 px-4">{order.paymentMethod}</td>
+
+                              {/* Product Price */}
+                              <td className="py-2 px-4">₹{order.product.finalPrice}</td>
+
+                              {/* Order Date */}
+                              <td className="py-2 px-4">{new Date(order.date).toLocaleDateString()}</td>
+
+                              {/* Editable Delivery Date */}
+                              <td className="py-2 px-4">
+                                <input
+                                  type="date"
+                                  value={order.deliveryDate && !isNaN(new Date(order.deliveryDate).getTime())
+                                    ? new Date(order.deliveryDate).toISOString().split('T')[0] // Format date for the date input
+                                    : ""
+                                  } // Format date for the date input
+                                  onChange={(e) => updateDeliveryDate(order._id, e.target.value)}
+                                  className="bg-gray-800 text-gray-300 py-1 px-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </td>
+
+                              {/* Status */}
+                              <td className="py-2 px-4">
+                                <select
+                                  value={order.status}
+                                  onChange={(e) => updateOrderStatus(order._id, e.target.value)}
+                                  className="bg-gray-800 text-gray-300 py-1 px-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                  <option value="Pending">Pending</option>
+                                  <option value="Processing">Processing</option>
+                                  <option value="Shipped">Shipped</option>
+                                  <option value="Delivered">Delivered</option>
+                                  <option value="Cancelled">Cancelled</option>
+                                </select>
+                              </td>
+
+                              {/* Actions */}
+                              <td className="py-2 px-4 text-center space-x-2">
+                                <button
+                                  onClick={() => updateOrderState(order._id, 'confirmed')}
+                                  className="py-1 px-3 bg-green-500 text-gray-900 rounded-md hover:bg-green-600 transition"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => updateOrderState(order._id, 'cancelled')}
+                                  className="py-1 px-3 bg-red-500 text-gray-900 rounded-md hover:bg-red-600 transition"
+                                >
+                                  Cancel
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 ) : (
                   <p className="text-gray-400">No pending orders found.</p>
                 )}
@@ -1400,6 +1510,7 @@ const AdminPanel = () => {
                                   <img
                                     src={`http://localhost:5000/uploads/${product.image[0].split('\\').pop()}`}
                                     alt={product.name}
+                                    loading="lazy"
                                     className="w-16 h-16 object-cover rounded-md"
                                   />
                                 )}
@@ -1423,7 +1534,9 @@ const AdminPanel = () => {
                                       )
                                       : [];
 
-                                    console.log("Product Object: ", product);
+                                    // console.log("Product Object: ", product);
+
+                                    // console.log("INSTOCK", product.inStock)
 
                                     setFormData({
                                       id: product._id,
@@ -1434,7 +1547,7 @@ const AdminPanel = () => {
                                       brand: product.brand,
                                       category: product.category,
                                       description: product.description,
-                                      stock: product.stock,
+                                      stock: product.inStock ? "yes" : "no",
                                       code: product.code,
                                       discount: product.discount,
                                       bonuses: product.bonuses,
@@ -1494,6 +1607,7 @@ const AdminPanel = () => {
                             <img
                               src={`http://localhost:5000/uploads/${selectedProduct.image[0].split('\\').pop()}`}
                               alt={selectedProduct.name}
+                              loading="lazy"
                               className="w-48 h-48 object-cover rounded-md"
                             />
                           )}
@@ -1572,6 +1686,7 @@ const AdminPanel = () => {
                                   <img
                                     src={`http://localhost:5000/uploads/${product.image[0].split('\\').pop()}`}
                                     alt={product.name}
+                                    loading="lazy"
                                     className="w-16 h-16 object-cover rounded-md"
                                   />
                                 )}
@@ -1604,7 +1719,7 @@ const AdminPanel = () => {
                                       brand: product.brand,
                                       category: product.category,
                                       description: product.description,
-                                      stock: product.stock,
+                                      stock: product.inStock ? "yes" : "no",
                                       code: product.code,
                                       discount: product.discount,
                                       bonuses: product.bonuses,
@@ -1663,6 +1778,7 @@ const AdminPanel = () => {
                                   <img
                                     src={`http://localhost:5000/uploads/${product.image[0].split('\\').pop()}`}
                                     alt={product.name}
+                                    loading="lazy"
                                     className="w-16 h-16 object-cover rounded-md"
                                   />
                                 )}
@@ -1686,7 +1802,7 @@ const AdminPanel = () => {
                                       )
                                       : [];
 
-                                    console.log("Product Object: ", product);
+                                    // console.log("Product Object: ", product);
 
                                     setFormData({
                                       id: product._id,
@@ -1697,7 +1813,7 @@ const AdminPanel = () => {
                                       brand: product.brand,
                                       category: product.category,
                                       description: product.description,
-                                      stock: product.stock,
+                                      stock: product.inStock ? "yes" : "no",
                                       code: product.code,
                                       discount: product.discount,
                                       bonuses: product.bonuses,
@@ -1836,6 +1952,7 @@ const AdminPanel = () => {
                                       key={index}
                                       src={preview}
                                       alt={`Preview ${index + 1}`}
+                                      loading="lazy"
                                       className="max-w-xs max-h-32 mr-2 mb-1"
                                     />
                                   </div>
@@ -2687,10 +2804,21 @@ const AdminPanel = () => {
                   Device Information{" "}
                   <span className="text-sm text-gray-500">({deviceInfo.length} entries)</span>
                 </h3>
-                {/* Arrow for toggle */}
-                <button onClick={toggleBox} className="text-gray-500">
-                  {isOpen ? <FaArrowUp /> : <FaArrowDown />}
-                </button>
+                <div className="flex items-center space-x-4">
+                  {/* Arrow for toggle */}
+                  <button onClick={toggleBox} className="text-gray-500">
+                    {isOpen ? <FaArrowUp /> : <FaArrowDown />}
+                  </button>
+                  {/* Delete All Button */}
+                  {deviceInfo.length > 0 && (
+                    <button
+                      onClick={handleDeletedeviceinformation}
+                      className="bg-red-600 text-white py-2 px-4 rounded-lg text-sm mt-4"
+                    >
+                      Delete All
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Device Info Box */}
@@ -2736,10 +2864,21 @@ const AdminPanel = () => {
                   Location Information{" "}
                   <span className="text-sm text-gray-500">({locationInfo.length} entries)</span>
                 </h3>
-                {/* Arrow for toggle */}
-                <button onClick={toggleBox1} className="text-gray-500">
-                  {isOpenforLocation ? <FaArrowUp /> : <FaArrowDown />}
-                </button>
+                <div className="flex items-center space-x-4">
+                  {/* Arrow for toggle */}
+                  <button onClick={toggleBox1} className="text-gray-500">
+                    {isOpenforLocation ? <FaArrowUp /> : <FaArrowDown />}
+                  </button>
+                  {/* Delete All Button */}
+                  {locationInfo.length > 0 && (
+                    <button
+                      onClick={handleDeletelocationinformation}
+                      className="bg-red-600 text-white py-2 px-4 rounded-lg text-sm mt-4"
+                    >
+                      Delete All
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Location Info Box */}

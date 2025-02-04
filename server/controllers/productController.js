@@ -5,10 +5,45 @@ import fs from 'fs';
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import mongoose from "mongoose";
-import MiniPC from "../models/MiniPC.js";
+
+const calculatePriceDetails = (product, selectedSpecs) => {
+  if (!product || typeof product.price !== "number") {
+    console.error("Invalid product data:", product);
+    return null;
+  }
+
+  const gstRate = 0.18; // 18% GST
+  const discount = product.discount || 0; // Default to 0 if undefined
+  const gst = product.price * gstRate;
+  let finalPrice = product.price + gst;
+
+  // Add the selected specs prices
+  if (selectedSpecs) {
+    Object.entries(selectedSpecs).forEach(([category, selectedValue]) => {
+      const specOptions = product.specs[category];
+      if (specOptions) {
+        const selectedOption = specOptions.find(option => option._id === selectedValue);
+        if (selectedOption) {
+          finalPrice += selectedOption.price || 0;
+        }
+      }
+    });
+  }
+
+  const priceWithGST = finalPrice;
+  const finalPriceAfterDiscount = priceWithGST - (priceWithGST * discount / 100);
+  const roundedPrice = Math.round(finalPriceAfterDiscount * 100) / 100;
+
+  return {
+    ...product._doc, // Spread existing product data
+    gst,
+    discount,
+    finalPrice: roundedPrice,
+  };
+};
 
 export const getProducts = async (req, res) => {
-  const { q, category, price, rating, brand } = req.query;
+  const { q, category, price, rating, brand, selectedSpecs, page = 1, limit = 10 } = req.query;
 
   try {
     let query = {};
@@ -22,51 +57,33 @@ export const getProducts = async (req, res) => {
       ];
     }
 
-    // Category filter
-    if (category) {
-      query.category = category;
-    }
+    // Filters
+    if (category) query.category = category;
+    if (price) query.price = { $lte: price };
+    if (rating) query.rating = { $gte: rating };
+    if (brand) query.brand = brand;
 
-    // Price filter (up to the provided price)
-    if (price) {
-      query.price = { $lte: price };
-    }
+    // Convert page and limit to numbers
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+    const skipNumber = (pageNumber - 1) * limitNumber;
 
-    // Rating filter
-    if (rating) {
-      query.rating = { $gte: rating };
-    }
+   // Fetch data with filters and pagination
+   const prebuildPC = await PreBuildPC.find(query).skip(skipNumber).limit(limitNumber);
+   const refurbishedProducts = await RefurbishedLaptop.find(query).skip(skipNumber).limit(limitNumber);
+   const miniPCs = await MiniPCs.find(query).skip(skipNumber).limit(limitNumber);
 
-    // Brand filter
-    if (brand) {
-      query.brand = brand;
-    }
-    
-    const prebuildPC = await PreBuildPC.find();
-    const refurbishedProducts = await RefurbishedLaptop.find();
-    const miniPCs = await MiniPCs.find();
+    const prebuildPCWithGSTAndDiscount = prebuildPC.map(product =>
+      calculatePriceDetails(product, selectedSpecs)
+    );
+    const refurbishedProductsWithGSTAndDiscount = refurbishedProducts.map(product =>
+      calculatePriceDetails(product, selectedSpecs)
+    );
+    const miniPCsWithGSTAndDiscount = miniPCs.map(product =>
+      calculatePriceDetails(product, selectedSpecs)
+    );
 
-    // Helper function to calculate GST and discount
-    const calculatePriceDetails = (product) => {
-      const gst = product.price * 0.18; // Example GST rate of 18%
-      const discount = product.discount || 0; // Default to 0 if no discount
-      const priceWithGST = product.price + gst; // Add GST to the original price
-      const finalPrice = priceWithGST - (priceWithGST * discount / 100); // Apply discount
-      const roundedPrice = Math.round(finalPrice * 100) / 100; // Round off to 2 decimal places
-
-      return {
-        ...product._doc, // Spread the existing product data
-        gst,
-        discount,
-        finalPrice: roundedPrice, // Add the final price after GST and discount
-      };
-    };
-
-    const prebuildPCWithGSTAndDiscount = prebuildPC.map(calculatePriceDetails);
-    const refurbishedProductsWithGSTAndDiscount = refurbishedProducts.map(calculatePriceDetails);
-    const miniPCsWithGSTAndDiscount = miniPCs.map(calculatePriceDetails);
-
-    res.json({ 
+    res.json({
       prebuildPC: prebuildPCWithGSTAndDiscount,
       refurbishedProducts: refurbishedProductsWithGSTAndDiscount,
       miniPCs: miniPCsWithGSTAndDiscount,
@@ -267,8 +284,8 @@ export const createProducts = async (req, res) => {
     } else if (type === 'Refurbished Laptop') {
       newProduct = new RefurbishedLaptop(productDataWithImages);
       await newProduct.save();
-    } else if (type === "Mini PC"){
-      newProduct = new MiniPC(productDataWithImages);
+    } else if (type === "Mini PC") {
+      newProduct = new MiniPCs(productDataWithImages);
       await newProduct.save();
     } else {
       return res.status(400).json({ message: 'Invalid product type' });
@@ -283,52 +300,10 @@ export const createProducts = async (req, res) => {
   }
 };
 
-// export const seedDatabase = async () => {
-//   try {
-//     const product = {
-//       type: "Refurbished",
-//       customId: "RF-DL-001",
-//       productId: 17361575705071846,
-//       name: "Refurbished Dell Latitude",
-//       description: "A high-quality refurbished laptop ideal for office tasks.",
-//       image: ["image1.jpg", "image2.jpg"],
-//       brand: "Dell",
-//       specs: {
-//         cpu: "Intel Core i5",
-//         ram: "8GB",
-//         storage: "256GB SSD",
-//         GraphicCard: "Integrated Intel UHD Graphics",
-//         display: "14-inch FHD",
-//         os: "Windows 10 Pro",
-//       },
-//       otherTechnicalDetails: [{ name: "Weight", value: "1.6kg" }],
-//       condition: "Excellent",
-//       notes: ["Tested and certified", "6-month warranty"],
-//       code: "DELL-RF-001",
-//       price: 499.99,
-//       category: ["Laptops", "Refurbished"],
-//     };
-
-//     const existingProduct = await RefurbishedLaptop.findOne({ productId: product.productId });
-//     if (existingProduct) {
-//       console.log("Product already exists:", existingProduct);
-//       return;
-//     }
-
-//     const newProduct = new RefurbishedLaptop(product);
-//     await newProduct.save();
-//     console.log("Product inserted successfully:", newProduct);
-//   } catch (error) {
-//     console.error("Error seeding database:", error.message);
-//   }
-// };
-
-// seedDatabase();
-
 export const updateProduct = async (req, res) => {
   const { productType, productId } = req.params;
 
-  console.log("Received productId:", productId);
+  // console.log("Received productId:", productId);
 
   const normalizedProductType = productType.toLowerCase().replace(/\s+/g, '-');
   // console.log("Normalized Product Type:", normalizedProductType);
@@ -344,7 +319,7 @@ export const updateProduct = async (req, res) => {
   } else if (normalizedProductType === 'pre-built-pc') {
     ProductModel = PreBuildPC;
   } else if (normalizedProductType === 'mini-pc') { // Add support for MiniPC
-    ProductModel = MiniPC;
+    ProductModel = MiniPCs;
   } else {
     return res.status(400).json({ message: 'Invalid product type' });
   }
@@ -400,7 +375,8 @@ export const updateProduct = async (req, res) => {
       reviews: product.reviews, // Ensure the reviews array is updated
       otherTechnicalDetails: Array.isArray(req.body.otherTechnicalDetails)
         ? req.body.otherTechnicalDetails
-        : JSON.parse(req.body.otherTechnicalDetails) // Correcting the format if it's a string
+        : JSON.parse(req.body.otherTechnicalDetails), // Correcting the format if it's a string
+      inStock: req.body.stock === "false" || req.body.stock === false ? false : true,
     };
 
     const updatedProduct = await ProductModel.findOneAndUpdate(query, updates, {
@@ -426,7 +402,7 @@ export const deleteProduct = async (req, res, next) => {
     } else if (productType === 'refurbished') {
       ProductModel = RefurbishedLaptop;
     } else if (productType === "mini-pc") { // Add support for MiniPC
-      ProductModel = MiniPC;
+      ProductModel = MiniPCs;
     } else {
       return res.status(400).json({ error: "Invalid product type" });
     }

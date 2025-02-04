@@ -81,9 +81,9 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchProducts = async (page = 1, limit = 10) => {
       try {
-        const response = await fetch("http://localhost:5000/api/admin/products", {
+        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
@@ -105,7 +105,7 @@ const Home = () => {
       }
     };
 
-    fetchProducts();
+    fetchProducts(1, 10);
   }, [])
 
   const renderStars = (rating) => {

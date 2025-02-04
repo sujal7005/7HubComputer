@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import moment from 'moment';
+import { generateInvoice } from '../utils/utils';
 
-const Profile = ({ }) => {
+const Profile = () => {
   const [user, setUser] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState('');
@@ -23,21 +24,52 @@ const Profile = ({ }) => {
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user'));
 
-    if (storedUser) {
-      setUser(storedUser);
-      setName(storedUser.name || '');
-      setPhoneNumber(storedUser.phoneNumber || '');
-      if (storedUser._id) {
-        fetchUserOrders(storedUser._id);
-        fetchUserAddresses(storedUser._id);
-        fetchTransactionHistory(storedUser._id);
-      } else {
-        console.error('User ID is missing');
-      }
+    if (storedUser && storedUser._id) {
+      // Fetch user profile if user data exists in localStorage
+      const fetchUserProfile = async () => {
+        try {
+          const response = await axios.get(`http://localhost:5000/api/users/${storedUser._id}`);
+          setUser(response.data); // Set the updated user data
+          setName(response.data.name || '');
+          setPhoneNumber(response.data.phoneNumber || '');
+          localStorage.setItem('user', JSON.stringify(response.data)); // Update localStorage with latest data
+
+          // Optionally, fetch orders, addresses, transaction history
+          fetchUserOrders(storedUser._id);
+          fetchUserAddresses(storedUser._id);
+          fetchTransactionHistory(storedUser._id);
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        }
+      };
+
+      fetchUserProfile();
     } else {
-      navigate('/signin'); // Redirect if not logged in
+      navigate('/signin'); // Redirect to sign-in if no user found in localStorage
     }
   }, [navigate]);
+
+  const handleInvoiceGeneration = async (order) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/orders/generate-invoice-pdf/${order._id}`);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `${order._id}_invoice.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        console.log('Error generating invoice');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
 
   const fetchUserOrders = async (userId) => {
     if (!userId) {
@@ -48,6 +80,7 @@ const Profile = ({ }) => {
     try {
       const response = await axios.get(`http://localhost:5000/api/users/${userId}/orders`);
       setUserOrders(Array.isArray(response.data) ? response.data : []);
+      console.log('User Orders:', response.data);
     } catch (error) {
       console.error('Failed to fetch user orders:', error);
     }
@@ -261,8 +294,16 @@ const Profile = ({ }) => {
               <p><strong>Email:</strong> {user.email}</p>
               <p><strong>Phone Number:</strong> {user.phoneNumber || 'N/A'}</p>
               <p className="text-xl font-semibold text-yellow-400 bg-yellow-700 p-2 rounded-lg shadow-md drop-shadow-[0_0_10px_rgba(255,223,0,0.7)]">
-                <strong>Bonus Points:</strong> {user.bonuses || 0}
+                <strong>Bonus Points:</strong> {user.bonusPoints}
               </p>
+
+              {/* Discount Code Floating Box */}
+              <div className="bg-gray-700 p-4 rounded mt-4 shadow-lg shadow-green-400/50">
+                <h3 className="text-xl font-bold mb-2 text-white">Discount Code</h3>
+                <p className="text-lg font-semibold text-green-400">{user.discountCode}</p>
+                <p className="text-white">Expires on: {moment(user.discountExpiresAt).format("MMMM D, YYYY")}</p>
+              </div>
+
               <button
                 onClick={() => setIsEditing(true)}
                 className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
@@ -274,10 +315,10 @@ const Profile = ({ }) => {
         </div>
 
         {/* Right Column: Your Orders */}
-        <div className="mt-6 flex-1 bg-gray-700 p-4 rounded sm:mt-0">
-          <h3 className="text-xl font-bold mb-2">Your Orders</h3>
+        <div className="mt-6 flex-1 bg-gray-700 p-4 rounded-lg sm:mt-0 shadow-lg">
+          <h3 className="text-2xl font-bold mb-4 text-white">Your Orders</h3>
           {userOrders.length > 0 ? (
-            <ul className="space-y-2">
+            <ul className="space-y-4">
               {userOrders.map((order) => (
                 <div>
                   <p className={`font-semibold p-2 rounded-md text-white ${getStatusClass(order.status)} transition-all duration-500 ease-in-out`}>
@@ -289,27 +330,36 @@ const Profile = ({ }) => {
                       )}
                     </span>
                   </p>
-                  <li key={order._id} className="bg-gray-600 p-4 rounded">
-                    <p><strong>Order ID:</strong> {order._id}</p>
-                    <p><strong>Product Name:</strong> {order.product?.name}</p>
-                    <p><strong>Order Date:</strong> {moment(order.date).format('MMM Do YYYY')}</p>
-                    <p><strong>Payment Method:</strong> {order.paymentMethod}</p>
-                    <p><strong>Delivery Date:</strong> {moment(order.deliveryDate).format('MMM Do YYYY')}</p>
-                    <p><strong>Status:</strong> {order.status}</p>
-                    <button
-                      className="mt-2 bg-blue-500 text-white px-4 py-2 rounded"
-                      onClick={() => handleViewOrderDetails(order._id)}
-                    >
-                      View Details
-                    </button>
-                    {order.status !== 'Cancelled' && (
+                  <li key={order._id} className="bg-gray-600 p-5 rounded-lg shadow-md hover:shadow-xl transition duration-300 ease-in-out">
+                    <p className="text-sm text-white mb-2"><strong>Order ID:</strong> {order._id}</p>
+                    <p className="text-sm text-white mb-2"><strong>Product Name:</strong> {order.product?.name}</p>
+                    <p className="text-sm text-white mb-2"><strong>Order Date:</strong> {moment(order.date).format('MMM Do YYYY')}</p>
+                    <p className="text-sm text-white mb-2"><strong>Payment Method:</strong> {order.paymentMethod}</p>
+                    <p className="text-sm text-white mb-2"><strong>Delivery Date:</strong> {moment(order.deliveryDate).format('MMM Do YYYY')}</p>
+                    <p className="text-sm text-white mb-2"><strong>Status:</strong> {order.status}</p>
+                    
+                    <div className='flex space-x-3'>
                       <button
-                        className="mt-2 bg-red-500 text-white px-4 py-2 rounded"
-                        onClick={() => handleCancelOrder(order._id)}
+                        className="bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition duration-300 ease-in-out"
+                        onClick={() => handleViewOrderDetails(order._id)}
                       >
-                        Cancel Order
+                        View Details
                       </button>
-                    )}
+
+                      {/* Button to generate invoice */}
+                      <button onClick={() => handleInvoiceGeneration(order)} 
+                        className="py-2 px-4 bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-300 ease-in-out">
+                        Generate Invoice
+                      </button>
+                      {order.status !== 'Cancelled' && (
+                        <button
+                          className="bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 transition duration-300 ease-in-out"
+                          onClick={() => handleCancelOrder(order._id)}
+                        >
+                          Cancel Order
+                        </button>
+                      )}
+                    </div>
                   </li>
                 </div>
               ))}
@@ -343,18 +393,18 @@ const Profile = ({ }) => {
                 <p><strong>Product Name:</strong> {selectedOrder.product?.name}</p>
                 <p><strong>Product Code:</strong> {selectedOrder.product?.code}</p>
                 <p>
-                  <strong>Product Price:</strong>{" "}
-                  {selectedOrder.product?.price
-                    ? `₹${selectedOrder.product.price.toLocaleString()}`
+                  <strong>Product Final Price:</strong>{" "}
+                  {selectedOrder.product?.finalPrice
+                    ? `₹${selectedOrder.product.finalPrice.toLocaleString()}`
                     : "Price not available"}
                 </p>
               </div>
 
               {/* User Info */}
               <div className="mb-4">
-                <p><strong>User Name:</strong> {user?.name}</p>
-                <p><strong>Phone Number:</strong> {user?.phoneNumber}</p>
-                <p><strong>Address:</strong> {user?.address}</p>
+                <p><strong>User Name:</strong> {selectedOrder.userDetails?.name}</p>
+                <p><strong>Phone Number:</strong> {selectedOrder.userDetails?.phoneNumber}</p>
+                <p><strong>Address:</strong> {`${selectedOrder.userDetails?.address.line1}, ${selectedOrder.userDetails?.address.line2}, ${selectedOrder.userDetails?.address.city}, ${selectedOrder.userDetails?.address.state}, ${selectedOrder.userDetails?.address.zip}`}</p>
               </div>
 
               {/* Order Info */}

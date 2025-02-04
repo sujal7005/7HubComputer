@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-// import { refurbishedLaptops } from '../data'; // Adjust the import path as needed
 
 const Laptop = () => {
   const { id } = useParams();
@@ -12,12 +11,14 @@ const Laptop = () => {
 
   useEffect(() => {
     // Fetch laptop data from the server
-    const fetchLaptops = async () => {
+    const fetchLaptops = async (page = 1, limit = 10) => {
+      setLoading(true);
+      setLaptops([]);
       try {
-        const response = await fetch('http://localhost:5000/api/admin/products');
+        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`);
         const data = await response.json();
         setLaptops(data.refurbishedProducts || []);
-        console.log(data);
+        // console.log(data);
         setLoading(false);
       } catch (error) {
         setError('An error occurred. Please try again.');
@@ -25,7 +26,7 @@ const Laptop = () => {
       }
     };
 
-    fetchLaptops();
+    fetchLaptops(1,10);
   }, [id]);
 
   const categoryArray = category.split(",").map((cat) => cat.trim());

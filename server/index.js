@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import bodyParser from 'body-parser';
 import path from 'path';
 import passport from 'passport';
@@ -126,6 +127,7 @@ io.on("connection", (socket) => {
 });
 
 app.use(express.json({ limit: '50mb' }));
+app.use(compression());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(bodyParser.json()); // Parse JSON bodies

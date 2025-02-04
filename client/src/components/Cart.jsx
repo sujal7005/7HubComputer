@@ -59,6 +59,7 @@ const Cart = () => {
                   <img
                     src={`http://localhost:5000/uploads/${item.image[0].split('\\').pop()}`}
                     alt={item.name}
+                    loading='lazy'
                     className="h-24 w-24 object-cover rounded-md mr-6 mb-4 md:mb-0"
                   />
                   <div className="text-center md:text-left">

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import axios from 'axios';
+import User from "../models/User.js";
 import Order from "../models/Order.js";
 import moment from "moment";
 import PaytmChecksum from "paytmchecksum";
@@ -55,7 +56,10 @@ const saveOrder = async (orderDetails, paymentMethod, res) => {
 
     const today = moment().startOf('day'); // Use moment.js for date handling
     const deliveryDate = today.add(1, 'days'); // Set delivery date to the next day
-    
+
+    // ✅ Ensure `bonuses` is always treated as a number
+    const totalBonusPoints = Number(orderDetails.product.bonuses || 0);
+
     const newOrder = new Order({
       ...orderDetails,
       userId: orderDetails.userDetails.userId,
@@ -63,10 +67,30 @@ const saveOrder = async (orderDetails, paymentMethod, res) => {
       deliveryDate: deliveryDate.toDate(), // Convert moment object to Date
     });
 
-    console.log(newOrder);
+    // console.log(newOrder);
     await newOrder.save();
 
-    res.json({ message: `Order confirmed with ${paymentMethod}.` });
+    // ✅ Update user's bonus points if valid
+    if (!isNaN(totalBonusPoints) && totalBonusPoints > 0) {
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { $inc: { bonusPoints: totalBonusPoints } },  // Increment user bonus points
+        { new: true }
+      );
+
+      if (updatedUser) {
+        console.log(`✅ Added ${totalBonusPoints} bonus points to user ${userId}`);
+      } else {
+        console.error("❌ User not found for bonus points update");
+      }
+    } else {
+      console.warn("⚠️ No valid bonus points to add.");
+    }
+
+    res.json({
+      message: `Order confirmed with ${paymentMethod}.`,
+      bonusPointsAdded: totalBonusPoints,
+    });
   } catch (error) {
     console.error(`Error processing ${paymentMethod} order:`, error.message);
     res.status(500).json({ error: `Failed to ${paymentMethod} order` });
@@ -74,7 +98,7 @@ const saveOrder = async (orderDetails, paymentMethod, res) => {
 };
 
 // Cash on Delivery
-router.post('/cash-on-delivery', (req,res) => {
+router.post('/cash-on-delivery', (req, res) => {
   const { orderDetails } = req.body;
   saveOrder(orderDetails, 'Cash on Delivery', res);
 });
@@ -87,12 +111,12 @@ router.post('/create-paypal-order', async (req, res) => {
   }
 
   try {
-    const PAYPAL_ACCESS_TOKEN = await getPayPalAccessToken();  
+    const PAYPAL_ACCESS_TOKEN = await getPayPalAccessToken();
     const conversionRate = 0.012;
     const formattedPrice = (orderDetails.product.price * conversionRate).toFixed(2);
     // Simulate interaction with PayPal API
     const paymentResponse = await axios.post(
-      'https://api-m.sandbox.paypal.com/v2/checkout/orders', 
+      'https://api-m.sandbox.paypal.com/v2/checkout/orders',
       {
         intent: 'CAPTURE',
         purchase_units: [
@@ -113,12 +137,12 @@ router.post('/create-paypal-order', async (req, res) => {
     console.log('PayPal request payload:', {
       intent: 'CAPTURE',
       purchase_units: [
-          {
-              amount: {
-                  currency_code: 'INR',
-                  value: formattedPrice,
-              },
+        {
+          amount: {
+            currency_code: 'INR',
+            value: formattedPrice,
           },
+        },
       ],
     });
 
@@ -192,25 +216,25 @@ router.post('/paytm', async (req, res) => {
     // Save the order details in the database
     const today = moment().startOf('day');
     const deliveryDate = today.add(1, 'days');
-     
+
     const newOrder = new Order({
-       ...orderDetails,
-       userId: orderDetails.userDetails.userId,
-       paymentMethod: 'Paytm',
-       deliveryDate: deliveryDate.toDate(),
-       orderId,
+      ...orderDetails,
+      userId: orderDetails.userDetails.userId,
+      paymentMethod: 'Paytm',
+      deliveryDate: deliveryDate.toDate(),
+      orderId,
     });
     await newOrder.save();
- 
+
     // Send the response back with Paytm redirect URL
     const paytmTransactionData = {
-       ...params,
-       CHECKSUMHASH: checksum,
+      ...params,
+      CHECKSUMHASH: checksum,
     };
 
-    res.json({ 
-      paytmTransactionData, 
-      message: "Order confirmed. Redirecting to Paytm for payment." 
+    res.json({
+      paytmTransactionData,
+      message: "Order confirmed. Redirecting to Paytm for payment."
     });
   } catch (error) {
     console.error("Paytm Payment Error:", error.message);
@@ -233,7 +257,7 @@ router.post('/paytm/callback', async (req, res) => {
   }
 
   const isChecksumValid = PaytmChecksum.verifySignature(paytmResponse, PAYTM_MERCHANT_KEY, checksumHash);
-  
+
   if (!isChecksumValid) {
     return res.status(400).json({ error: 'Checksum validation failed.' });
   }
@@ -244,7 +268,7 @@ router.post('/paytm/callback', async (req, res) => {
 
   try {
     const order = await Order.findOne({ orderId });
-    
+
     if (!order) {
       return res.status(404).json({ error: 'Order not found.' });
     }

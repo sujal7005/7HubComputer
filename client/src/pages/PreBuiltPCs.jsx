@@ -12,9 +12,9 @@ const PreBuiltPCs = () => {
 
   useEffect(() => {
     // Fetch data from the backend
-    const fetchPCs = async () => {
+    const fetchPCs = async (page = 1, limit = 10) => {
       try {
-        const response = await fetch('http://localhost:5000/api/admin/products');
+        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`);
         const data = await response.json();
         console.log(data)
         setPcs(data.prebuildPC);
@@ -26,7 +26,7 @@ const PreBuiltPCs = () => {
       }
     };
 
-    fetchPCs();
+    fetchPCs(1, 10);
   }, [id]);
 
   const filteredPCs = Array.isArray(pcs)

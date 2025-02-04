@@ -9,6 +9,7 @@ const miniPCSchema = new mongoose.Schema({
     description: { type: String, required: true },
     image: { type: [String], required: true },
     brand: { type: String, required: true },
+    quantity: { type: Number, default: 1 },
     specs: {
         platform: { type: String, required: true },
         cpu: { type: String, required: true },

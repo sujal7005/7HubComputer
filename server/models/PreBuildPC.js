@@ -9,6 +9,7 @@ const preBuiltPCSchema = new mongoose.Schema({
   description: { type: String, required: true, },
   image: { type: [String], required: true },
   brand: { type: String, required: true, },
+  quantity: { type: Number, default: 1 },
   specs: {
     platform: { type: String, required: true },
     cpu: { type: String, required: true },
@@ -48,7 +49,7 @@ const preBuiltPCSchema = new mongoose.Schema({
   code: { type: String, required: true },
   price: { type: Number, required: true },
   category: [{ type: String, required: true }],
-  inStock: { type: Boolean, default: true },
+  inStock: { type: Boolean, default: false },
   popularity: { type: Number, default: 0 },
   originalPrice: { type: Number },
   discount: { type: Number, default: 20 },

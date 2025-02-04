@@ -246,6 +246,22 @@ router.put('/orders/:orderId/state', async (req, res) => {
       order.status = 'Confirmed';
     } else if (action === 'cancelled') {
       order.status = 'Cancelled';
+
+      // Get the user associated with this order
+      const user = await User.findById(order.userId);
+
+      if (user) {
+        const bonusPointsToRemove = order.product.bonuses || 0; // Get bonus points from the order
+
+        if (user.bonusPoints && user.bonusPoints >= bonusPointsToRemove) {
+          // If the user has enough bonus points, deduct them
+          user.bonusPoints -= bonusPointsToRemove;
+          await user.save();
+          console.log(`✅ Removed ${bonusPointsToRemove} bonus points from user ${user._id}`);
+        } else {
+          console.warn(`⚠️ User ${user._id} does not have enough bonus points to deduct`);
+        }
+      }
     } else {
       return res.status(400).json({ message: 'Invalid action' });
     }
@@ -255,6 +271,39 @@ router.put('/orders/:orderId/state', async (req, res) => {
   } catch (error) {
     console.error('Error updating order state:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+router.delete('/admin/orders/delete', async (req, res) => {
+  const { orderIds } = req.body;
+
+  if (!orderIds || orderIds.length === 0) {
+    return res.status(400).json({ message: 'No orders selected for deletion.' });
+  }
+
+  try {
+    // Delete multiple orders based on orderIds
+    const result = await Order.deleteMany({ _id: { $in: orderIds } });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'No orders found to delete.' });
+    }
+
+    res.status(200).json({ message: 'Orders deleted successfully!' });
+  } catch (error) {
+    console.error('Error deleting order:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Fetch all device info
+router.get("/admin/device-info", async (req, res) => {
+  try {
+    const deviceInfos = await DeviceInfo.find();
+    res.status(200).json(deviceInfos);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch device info" });
   }
 });
 
@@ -270,6 +319,30 @@ router.post("/admin/device-info", async (req, res) => {
   }
 });
 
+router.delete('/admin/device-info', async (req, res) => {
+  try {
+    // Delete all device information from the database
+    await DeviceInfo.deleteMany({});  // This will delete all documents in the 'deviceInfo' collection
+
+    // Send a success response
+    res.status(200).json({ message: 'All device information has been deleted.' });
+  } catch (err) {
+    console.error('Error deleting device information:', err);
+    res.status(500).json({ message: 'Error deleting device information.' });
+  }
+});
+
+// Fetch all location info
+router.get("/admin/location", async (req, res) => {
+  try {
+    const locationInfos = await LocationInfo.find();
+    res.status(200).json(locationInfos);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch location info" });
+  }
+});
+
 // Save location info
 router.post("/admin/location", async (req, res) => {
   try {
@@ -282,25 +355,16 @@ router.post("/admin/location", async (req, res) => {
   }
 });
 
-// Fetch all device info
-router.get("/admin/device-info", async (req, res) => {
+router.delete('/admin/location-info', async (req, res) => {
   try {
-    const deviceInfos = await DeviceInfo.find();
-    res.status(200).json(deviceInfos);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to fetch device info" });
-  }
-});
+    // Delete all location information from the database
+    await LocationInfo.deleteMany({});  // This will delete all documents in the 'locationInfo' collection
 
-// Fetch all location info
-router.get("/admin/location", async (req, res) => {
-  try {
-    const locationInfos = await LocationInfo.find();
-    res.status(200).json(locationInfos);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to fetch location info" });
+    // Send a success response
+    res.status(200).json({ message: 'All location information has been deleted.' });
+  } catch (err) {
+    console.error('Error deleting location information:', err);
+    res.status(500).json({ message: 'Error deleting location information.' });
   }
 });
 

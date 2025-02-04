@@ -19,8 +19,9 @@ const ProductDetails = () => {
   const productId = id;
 
   const [product, setProduct] = useState(null);
+  const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
-  const { addToCart, isLoggedIn } = useContext(CartContext);
+  const { addToCart, isLoggedIn, updateQuantity } = useContext(CartContext);
   const navigate = useNavigate();
 
   const [paymentError, setPaymentError] = useState('');
@@ -55,9 +56,9 @@ const ProductDetails = () => {
   }, [specs]); // This will run when specs change
 
   useEffect(() => {
-    const fetchProduct = async () => {
+    const fetchProduct = async (page = 1, limit = 10) => {
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/products`);
+        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`);
         if (response.ok) {
           const data = await response.json();
           // console.log("API Response:", data);
@@ -99,7 +100,7 @@ const ProductDetails = () => {
       }
     };
 
-    fetchProduct();
+    fetchProduct(1, 10);
   }, [id, isRefurbished, isMiniPC]);
 
   // Auto-scrolling for images
@@ -124,6 +125,18 @@ const ProductDetails = () => {
     console.log('Product is null or undefined');
     return <p className='text-amber-700'>Product not found</p>;
   }
+
+  const handleIncrease = () => {
+    setQuantity((prev) => prev + 1);
+    updateQuantity(product.id, quantity + 1);
+  };
+
+  const handleDecrease = () => {
+    if (quantity > 1) {
+      setQuantity((prev) => prev - 1);
+      updateQuantity(product.id, quantity - 1);
+    }
+  };
 
   // Function to calculate the price of the selected specs
   const getSelectedSpecsPrice = () => {
@@ -251,12 +264,8 @@ const ProductDetails = () => {
       }
 
       try {
-        // Put the review data to the server
-        // console.log(productType)
-        // console.log(productId)
-        // console.log(`http://localhost:5000/api/admin/products/${encodeURIComponent(productType)}/${encodeURIComponent(productId)}`)
 
-        const response = await fetch(`http://localhost:5000/api/admin/products/${encodeURIComponent(productType)}/${encodeURIComponent(productId)}`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/products/${encodeURIComponent(productType)}/${encodeURIComponent(productId)}`, {
           method: 'PUT',
           headers: {
             Authorization: `Bearer ${user.token}`,
@@ -282,6 +291,18 @@ const ProductDetails = () => {
         console.error('Error submitting review:', error);
       }
     }
+  };
+
+  const downloadQuotation = async () => {
+    const response = await fetch(`http://localhost:5000/api/download-quotation/${product._id}`);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Quotation-${product.name}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleConfirmPayment = async () => {
@@ -327,6 +348,7 @@ const ProductDetails = () => {
                       src={`http://localhost:5000/uploads/${sanitizedPath}`}
                       alt={`${product.name} - Image ${index + 1}`}
                       onClick={() => handleThumbnailClick(index)}
+                      loading='lazy'
                       className={`absolute w-auto h-full object-cover transition-opacity duration-1000 ease-in-out ${index === currentImageIndex ? "opacity-100" : "opacity-0"
                         }`}
                     />
@@ -435,6 +457,25 @@ const ProductDetails = () => {
           <h1 className="text-2xl md:text-3xl font-bold">{product.name}</h1>
           <p className="text-gray-400">Code: {code}</p>
 
+          {/* Quantity Selector */}
+          <div className="flex items-center space-x-4 mt-4">
+            <button
+              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-l-lg text-lg font-bold transition"
+              onClick={handleDecrease}
+            >
+              -
+            </button>
+            <span className="bg-gray-800 text-white text-lg font-semibold px-6 py-2 rounded-md border border-gray-600">
+              {quantity}
+            </span>
+            <button
+              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-r-lg text-lg font-bold transition"
+              onClick={handleIncrease}
+            >
+              +
+            </button>
+          </div>
+
           {/* Product Rating */}
           <div className="flex items-center cursor-pointer" onClick={() => handleStarClick(product.rating)}>
             {stars.map((star, index) => (
@@ -472,13 +513,23 @@ const ProductDetails = () => {
               >
                 ADD TO CART
               </button>
-              <button
-                onClick={handleConfirmPayment}
-                disabled={!stripe}
-                className="bg-green-600 text-white py-3 px-10 rounded-lg text-xl font-semibold mt-4 md:mt-0"
-              >
-                BUY NOW
-              </button>
+              {product.inStock && (
+                <button
+                  onClick={handleConfirmPayment}
+                  disabled={!stripe}
+                  className="bg-green-600 text-white py-3 px-10 rounded-lg text-xl font-semibold mt-4 md:mt-0"
+                >
+                  BUY NOW
+                </button>
+              )}
+              {productType === "Pre-Built PC" && (
+                <button
+                  onClick={downloadQuotation}
+                  className="bg-yellow-500 text-black py-3 px-6 rounded-lg text-lg font-semibold mt-4"
+                >
+                  Download Quotation
+                </button>
+              )}
             </div>
           </div>
 

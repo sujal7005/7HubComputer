@@ -19,11 +19,11 @@ const SearchResults = ({ searchQuery, preBuiltPCs, refurbishedProducts }) => {
 
   // Effect to fetch products based on query and filters
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchProducts = async (page = 1, limit = 10) => {
       setLoading(true);
       try {
         console.log("Search Query:", query);
-        const response = await fetch(`http://localhost:5000/api/admin/products?q=${query}&category=${category}&price=${priceRange[1]}&rating=${rating}&brand=${brand}`);
+        const response = await fetch(`http://localhost:5000/api/admin/products?q=${query}&category=${category}&price=${priceRange[1]}&rating=${rating}&brand=${brand}&page=${page}&limit=${limit}`);
         const data = await response.json();
         console.log(data);
 
@@ -43,7 +43,7 @@ const SearchResults = ({ searchQuery, preBuiltPCs, refurbishedProducts }) => {
     };
 
     if (query) {
-      fetchProducts();
+      fetchProducts(1, 10);
     }
   }, [query, category, priceRange, rating, brand]);
 
