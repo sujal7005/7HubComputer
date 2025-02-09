@@ -9,7 +9,7 @@ import { CartProvider } from './context/CartContext';
 import './index.css';
 
 const stripePromise = loadStripe('your-publishable-key-from-stripe');
-const clientId = "863030671533-t2ja342l6vmi58oqopqeoqtnjlfce0kh.apps.googleusercontent.com";
+const clientId = "your-client-ID";
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
