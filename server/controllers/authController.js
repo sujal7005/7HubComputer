@@ -1,7 +1,7 @@
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || "863030671533-jfc601o3jbou0dnsu9obvasrq2i7onlm.apps.googleusercontent.com");
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // Google sign-in handler
 export const googleSignin = async (req, res) => {
   const { credential } = req.body; // Extract Google token from request body
