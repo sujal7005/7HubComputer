@@ -1,5 +1,6 @@
 // src/components/Header.jsx
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
+import axios from 'axios';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
 import { FaShoppingCart, FaUserCircle } from 'react-icons/fa';
@@ -7,17 +8,69 @@ import { FaShoppingCart, FaUserCircle } from 'react-icons/fa';
 const Header = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const { cartItems } = useContext(CartContext);
+  const [suggestions, setSuggestions] = useState([]);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = React.useState({});
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (searchTerm.length > 0) {
+      axios
+        .get(`http://localhost:4000/api/admin/products?q=${searchTerm}`)
+        .then((res) => {
+          console.log("API Response:", res.data);
+          const allProducts = [
+            ...res.data.prebuildPC || [],
+            ...res.data.officePC || [],
+            ...res.data.refurbishedProducts || [],
+            ...res.data.miniPCs || []
+          ];
+          setSuggestions(allProducts);
+        })
+        .catch((err) => {
+          console.error("Error fetching suggestions:", err)
+          setSuggestions([]);
+        });
+    } else {
+      setSuggestions([]);
+    }
+  }, [searchTerm]);
 
   const handleSearch = (event) => {
     event.preventDefault();
     if (searchTerm.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
       setSearchTerm('');
+      setSuggestions([]);
     }
+  };
+
+  const generateUrl = (product) => {
+    let type = product.type || ""; // Ensure type is at least an empty string
+    if (typeof type !== "string") {
+      console.warn("Invalid type:", type);
+      type = "pc"; // Fallback to default if type is not a string
+    }
+  
+    let basePath = "pc"; // Default path
+    const lowerCaseType = type.toLowerCase();
+  
+    if (lowerCaseType.includes("mini pc")) {
+      basePath = "mini-pcs";
+    } else if (lowerCaseType.includes("refurbished")) {
+      basePath = "refurbished";
+    }
+  
+    return `/${basePath}/${product._id}`;
+  };
+
+  
+  const handleSuggestionClick = (product) => {
+    const productUrl = generateUrl(product);
+    navigate(productUrl);
+    setSearchTerm('');
+    setSuggestions([]);
   };
 
   const toggleMenu = () => setIsOpen(!isOpen);
@@ -41,7 +94,7 @@ const Header = () => {
         </Link>
 
         {/* Search Bar */}
-        <form onSubmit={handleSearch} className="hidden md:flex items-center w-1/2">
+        <form onSubmit={handleSearch} className="hidden md:flex items-center w-1/2 relative">
           <input
             type="text"
             placeholder="Search for PCs..."
@@ -49,6 +102,28 @@ const Header = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          {/* Suggestions Dropdown */}
+          {suggestions.length > 0 && (
+            <ul className="absolute top-full left-0 right-0 bg-gray-800 text-gray-300 text-xs rounded-md mt-1 shadow-lg max-h-40 overflow-y-auto">
+              {suggestions.map((product, index) => (
+                <li
+                  key={index}
+                  className="p-2 hover:bg-gray-700 cursor-pointer flex items-center gap-3"
+                  onClick={() => handleSuggestionClick(product)}
+                >
+                  <img
+                    src={`http://localhost:4000/uploads/${product.image[0].split('\\').pop()}`}
+                    alt={product.name}
+                    className="w-12 h-12 object-cover rounded-md border border-gray-700"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium">{product.name}</p>
+                    <p className="text-indigo-400 font-semibold">₹{product.finalPrice}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
           <button
             type="submit"
             className="px-3 py-1.5 bg-indigo-600 text-white rounded-r-md hover:bg-indigo-700 text-xs"

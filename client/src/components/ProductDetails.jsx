@@ -1,5 +1,6 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useStripe } from '@stripe/react-stripe-js';
 import { CartContext } from '../context/CartContext';
 
@@ -58,17 +59,9 @@ const ProductDetails = () => {
   useEffect(() => {
     const fetchProduct = async (page = 1, limit = 10) => {
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`);
+        const response = await fetch(`http://localhost:4000/api/admin/products?page=${page}&limit=${limit}`);
         if (response.ok) {
           const data = await response.json();
-          // console.log("API Response:", data);
-
-          // console.log("ID from URL:", id);
-
-          // Log product IDs to verify matching
-          // console.log("Refurbished Product IDs:", data.refurbishedProducts.map(item => item._id));
-          // console.log("Prebuild PC IDs:", data.prebuildPC.map(item => item._id));
-          // console.log("Mini PC IDs:", data.miniPCs.map(item => item._id));
 
           let productItem;
 
@@ -77,7 +70,7 @@ const ProductDetails = () => {
           } else if (isMiniPC) {
             productItem = data.miniPCs.find((item) => item._id === id);
           } else {
-            productItem = data.prebuildPC.find((item) => item._id === id);
+            productItem = [...data.prebuildPC, ...data.officePC].find((item) => item._id === id);
           }
 
           console.log('Found Product:', productItem);
@@ -293,16 +286,23 @@ const ProductDetails = () => {
     }
   };
 
-  const downloadQuotation = async () => {
-    const response = await fetch(`http://localhost:5000/api/download-quotation/${product._id}`);
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Quotation-${product.name}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const downloadQuotation = async (productId, productName) => {
+    try {
+      const response = await fetch(`http://localhost:4000/api/download-quotation/${productId}`);
+
+      if (!response.ok) throw new Error("Failed to fetch quotation");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Quotation-${productName}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Download Error:", error);
+    }
   };
 
   const handleConfirmPayment = async () => {
@@ -325,6 +325,13 @@ const ProductDetails = () => {
 
   return (
     <>
+      <Helmet>
+        <title>{product ? `${product.name} | 7HubComputers` : "Product Details"}</title>
+        <meta name="description" content={product?.description || "Product details page"} />
+        <meta property="og:title" content={product?.name || "Product Details"} />
+        <meta property="og:description" content={product?.description || "Product details page"} />
+        <meta property="og:image" content={images?.[0] ? `http://localhost:4000/uploads/${images[0]}` : "default-image-url"} />
+      </Helmet>
       <div className={`flex flex-col md:flex-row justify-start items-start p-5 md:p-10 bg-gray-900 text-white min-h-screen ${isModalOpen ? 'blur-sm' : ''}`}>
         {/* Left Section - Image Slider */}
         <div className="w-full md:w-1/3 flex flex-col justify-start items-center relative mb-5 md:mb-0 md:sticky top-20 z-2">
@@ -345,7 +352,7 @@ const ProductDetails = () => {
                   return (
                     <img
                       key={index}
-                      src={`http://localhost:5000/uploads/${sanitizedPath}`}
+                      src={`http://localhost:4000/uploads/${sanitizedPath}`}
                       alt={`${product.name} - Image ${index + 1}`}
                       onClick={() => handleThumbnailClick(index)}
                       loading='lazy'
@@ -389,7 +396,7 @@ const ProductDetails = () => {
           <div className="flex space-x-2 mt-4 overflow-x-scroll overflow-y-hidden">
             {images.map((thumbnail, index) => {
               const sanitizedPath = thumbnail.split("\\").pop(); // Extract the filename
-              const thumbnailURL = `http://localhost:5000/uploads/${sanitizedPath}`; // Construct the correct URL
+              const thumbnailURL = `http://localhost:4000/uploads/${sanitizedPath}`; // Construct the correct URL
 
               return (
                 <img
@@ -413,7 +420,7 @@ const ProductDetails = () => {
               {/* Large Image */}
               <div className="relative top-5">
                 <img
-                  src={`http://localhost:5000/uploads/${images[modalImageIndex].split("\\").pop()}`}
+                  src={`http://localhost:4000/uploads/${images[modalImageIndex].split("\\").pop()}`}
                   alt={`Large view of ${product.name}`}
                   className="max-w-full max-h-[75vh] object-contain z-10"
                 />
@@ -428,7 +435,7 @@ const ProductDetails = () => {
               {/* Thumbnail Navigation */}
               <div className="flex space-x-2 mt-5 overflow-x-auto">
                 {images.map((thumbnail, index) => {
-                  const sanitizedPath = `http://localhost:5000/uploads/${thumbnail.split("\\").pop()}`;
+                  const sanitizedPath = `http://localhost:4000/uploads/${thumbnail.split("\\").pop()}`;
                   return (
                     <img
                       key={index}
@@ -524,7 +531,7 @@ const ProductDetails = () => {
               )}
               {productType === "Pre-Built PC" && (
                 <button
-                  onClick={downloadQuotation}
+                  onClick={() => downloadQuotation(product._id, product.name)}
                   className="bg-yellow-500 text-black py-3 px-6 rounded-lg text-lg font-semibold mt-4"
                 >
                   Download Quotation
@@ -549,6 +556,12 @@ const ProductDetails = () => {
                           <span>Liquid&nbsp;Cooler</span>
                         ) : category === "graphiccard" ? (
                           <span>Graphic&nbsp;Card</span>
+                        ) : category === "ramOptions" ? (
+                          <span>RAM-Options</span>
+                        ) : category === "storage1Options" ? (
+                          <span>storage1-Options</span>
+                        ) : category === "storage2Options" ? (
+                          <span>storage2-Options</span>
                         ) : (
                           category // Default display of the category name
                         )}

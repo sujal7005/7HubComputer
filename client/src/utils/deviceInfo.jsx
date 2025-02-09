@@ -8,7 +8,7 @@ export const sendDeviceInfo = () => {
     },
   };
 
-  fetch("http://localhost:5000/api/admin/device-info", {
+  fetch("http://localhost:4000/api/admin/device-info", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(deviceInfo),
@@ -20,7 +20,7 @@ export const sendLocationInfo = () => {
     (position) => {
       const { latitude, longitude } = position.coords;
 
-      fetch("http://localhost:5000/api/admin/location", {
+      fetch("http://localhost:4000/api/admin/location", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

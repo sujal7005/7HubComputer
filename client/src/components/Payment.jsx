@@ -46,10 +46,10 @@ const Payment = () => {
 
         if (!userId) return;
 
-        const userResponse = await axios.get(`http://localhost:5000/api/users/${userId}`);
+        const userResponse = await axios.get(`http://localhost:4000/api/users/${userId}`);
         const userData = userResponse.data;
 
-        const addressResponse = await axios.get(`http://localhost:5000/api/users/${userId}/addresses`);
+        const addressResponse = await axios.get(`http://localhost:4000/api/users/${userId}/addresses`);
         const addresses = addressResponse.data;
         // console.log('User addresses:', addresses);
 
@@ -127,10 +127,10 @@ const Payment = () => {
     }
 
     const loggedInUserId = localStorage.getItem('user');
-    console.log('Logged in user from localStorage:', loggedInUserId);
+    // console.log('Logged in user from localStorage:', loggedInUserId);
 
     const parsedUser = loggedInUserId ? JSON.parse(loggedInUserId) : null;
-    console.log('Parsed user:', parsedUser);
+    // console.log('Parsed user:', parsedUser);
 
     const userWithUserId = {
       ...userDetails,
@@ -160,7 +160,7 @@ const Payment = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000${apiUrl}`, {
+      const response = await fetch(`http://localhost:4000${apiUrl}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderDetails: { product, userDetails: userWithUserId, quantity, } })

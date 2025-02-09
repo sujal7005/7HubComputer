@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FaArrowDown, FaArrowUp } from 'react-icons/fa';
 import { io } from "socket.io-client";
+import DashboardGraphs from "./DashboardGraphs";
 
 const AdminPanel = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -19,6 +20,7 @@ const AdminPanel = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [recipient, setRecipient] = useState(""); // For a single email
   const [formData, setFormData] = useState({
@@ -59,26 +61,26 @@ const AdminPanel = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter products based on the search term
-  const filteredPreBuiltPCs = (products || []).filter(
-    (product) =>
-      product.type === 'Pre-Built PC' &&
-      (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.code.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // const filteredPreBuiltPCs = (products || []).filter(
+  //   (product) =>
+  //     product.type === 'Pre-Built PC' &&
+  //     (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //       product.code.toLowerCase().includes(searchTerm.toLowerCase()))
+  // );
 
-  const filteredRefurbishedLaptops = (products || []).filter(
-    (product) =>
-      product.type === 'Refurbished Laptop' &&
-      (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.code.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // const filteredRefurbishedLaptops = (products || []).filter(
+  //   (product) =>
+  //     product.type === 'Refurbished Laptop' &&
+  //     (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //       product.code.toLowerCase().includes(searchTerm.toLowerCase()))
+  // );
 
-  const filteredMiniPCs = (products || []).filter(
-    (product) =>
-      product.type === 'Mini PC' &&
-      (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.code.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // const filteredMiniPCs = (products || []).filter(
+  //   (product) =>
+  //     product.type === 'Mini PC' &&
+  //     (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //       product.code.toLowerCase().includes(searchTerm.toLowerCase()))
+  // );
 
   // Filter orders based on the search query
   const filteredOrders = orders.filter(order =>
@@ -87,7 +89,7 @@ const AdminPanel = () => {
 
   useEffect(() => {
     // Connect to Socket.io server 
-    const socketConnection = io("http://localhost:5000", {
+    const socketConnection = io("http://localhost:4000", {
       transports: ["polling", "websocket"],
       withCredentials: true,
     });
@@ -120,7 +122,7 @@ const AdminPanel = () => {
     // Fetch device info from backend
     const fetchDeviceInfo = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/admin/device-info");
+        const response = await fetch("http://localhost:4000/api/admin/device-info");
         const data = await response.json();
         setDeviceInfo(data);
       } catch (error) {
@@ -131,7 +133,7 @@ const AdminPanel = () => {
     // Fetch location info from backend
     const fetchLocationInfo = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/admin/location");
+        const response = await fetch("http://localhost:4000/api/admin/location");
         const data = await response.json();
         setLocationInfo(data);
       } catch (error) {
@@ -146,7 +148,7 @@ const AdminPanel = () => {
   useEffect(() => {
     const fetchProducts = async (page = 1, limit = 10) => {
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`, {
+        const response = await fetch(`http://localhost:4000/api/admin/products?page=${page}&limit=${limit}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
@@ -157,9 +159,16 @@ const AdminPanel = () => {
           ...data.prebuildPC,
           ...data.refurbishedProducts,
           ...data.miniPCs,
+          ...data.officePC,
           // Add any other product categories here if applicable
-        ];
+        ].filter(product => product && product.type);
+
+        console.log("All Products:", allProducts);
         setProducts(allProducts);
+
+        // Extract unique product types dynamically
+        const uniqueCategories = [...new Set(allProducts.map((product) => product.type))];
+        setCategories(uniqueCategories);
       } catch (error) {
         console.error(error);
         setError("Unable to load products. Please try again.");
@@ -168,7 +177,7 @@ const AdminPanel = () => {
 
     const fetchUsers = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/users`, {
+        const response = await fetch(`http://localhost:4000/api/admin/users`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         if (!response.ok) throw new Error("Failed to fetch users");
@@ -185,7 +194,7 @@ const AdminPanel = () => {
         const user = JSON.parse(localStorage.getItem('user'));
         const userId = user?.userId;
 
-        const response = await fetch(`http://localhost:5000/api/users/${userId}/orders`, {
+        const response = await fetch(`http://localhost:4000/api/users/${userId}/orders`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
@@ -204,8 +213,8 @@ const AdminPanel = () => {
     const fetchData = async () => {
       try {
         const [subResponse, msgResponse] = await Promise.all([
-          fetch("http://localhost:5000/api/subscribers"),
-          fetch("http://localhost:5000/api/message-history"),
+          fetch("http://localhost:4000/api/subscribers"),
+          fetch("http://localhost:4000/api/message-history"),
         ]);
 
         setSubscribers(await subResponse.json());
@@ -224,7 +233,7 @@ const AdminPanel = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/admin/dashboard", {
+        const response = await fetch("http://localhost:4000/api/admin/dashboard", {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`, // Include JWT in headers
           },
@@ -248,7 +257,7 @@ const AdminPanel = () => {
 
     const fetchLoginHistory = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/admin/login-history", {
+        const response = await fetch("http://localhost:4000/api/admin/login-history", {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
@@ -430,7 +439,7 @@ const AdminPanel = () => {
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch("http://localhost:5000/api/admin/users", {
+      const response = await fetch("http://localhost:4000/api/admin/users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -450,7 +459,7 @@ const AdminPanel = () => {
 
   const handleDeleteUser = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/users/${id}`, {
+      const response = await fetch(`http://localhost:4000/api/admin/users/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
@@ -482,7 +491,7 @@ const AdminPanel = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/users/${editingUser._id}`, {
+      const response = await fetch(`http://localhost:4000/api/admin/users/${editingUser._id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -520,7 +529,7 @@ const AdminPanel = () => {
     // console.log("this function buildformdata in working")
 
     // Generate ID if productType is 'pre-built PC' or 'refurbished laptop'
-    if (["pre-built PC", "refurbished laptop", "mini PC"].includes(formData.type)) {
+    if (["pre-built PC", "refurbished laptop", "mini PC", "office PC"].includes(formData.type)) {
       formData.id = formData.id || `${Date.now()}${Math.floor(Math.random() * 10000)}`; // Generate unique ID
     }
 
@@ -558,7 +567,7 @@ const AdminPanel = () => {
     };
 
     // Append RAM, Storage options if product type is 'pre-built PC'
-    if (formData.type === "Pre-Built PC" || formData.type === "mini PC") {
+    if (["Pre-Built PC"].includes(formData.type)) {
       appendOptions(formData.ramOptions, "ramOptions");
       appendOptions(formData.storage1Options, "storage1Options");
 
@@ -572,7 +581,8 @@ const AdminPanel = () => {
     const productTypeFields = {
       "pre-built PC": ["platform", "motherboard", "storage1", "storage2", "liquidcooler", "graphiccard", "smps", "cabinet"],
       "refurbished laptop": ["ram", "storage", "graphiccard", "display", "os", "condition"],
-      "mini PC": ["storage1", "graphiccard", "motherboard", "smps", "cabinet"],
+      "mini PC": ["storage", "graphiccard", "motherboard", "smps", "cabinet"],
+      "office PC": ["platform", "motherboard", "storage", "graphiccard", "smps", "cabinet"],
     };
 
     (productTypeFields[formData.type] || []).forEach((field) => {
@@ -606,11 +616,6 @@ const AdminPanel = () => {
       formDataToSend.append("otherTechnicalDetails", JSON.stringify(formData.otherTechnicalDetails));
     }
 
-    // console.log("ramOptions:", JSON.stringify(formData.ramOptions, null, 2));
-    // console.log("storage1Options:", JSON.stringify(formData.storage1Options, null, 2));
-    // console.log("storage2Options:", JSON.stringify(formData.storage2Options, null, 2));
-
-
     // Log FormData fields
     console.log("Final FormData to be sent:");
     for (let [key, value] of formDataToSend.entries()) {
@@ -623,10 +628,7 @@ const AdminPanel = () => {
   // Function to submit product data
   const submitProduct = async (url, method, formDataToSend) => {
 
-    // console.log("this function submitproduct in working")
-
     try {
-      // console.log("Authorization Token:", localStorage.getItem("token"));
       const response = await fetch(url, {
         method,
         headers: {
@@ -670,8 +672,8 @@ const AdminPanel = () => {
       console.log(formData.type);
 
       const url = isEditOperation
-        ? `http://localhost:5000/api/admin/products/${encodeURIComponent(formData.type)}/${formData.id}` // Use the existing product ID for editing
-        : "http://localhost:5000/api/admin/products/add";  // POST for new products
+        ? `http://localhost:4000/api/admin/products/${encodeURIComponent(formData.type)}/${formData.id}` // Use the existing product ID for editing
+        : "http://localhost:4000/api/admin/products/add";  // POST for new products
 
       console.log("Final URL:", url); // Debug the URL
       console.log("Request Method:", method); // Debug the HTTP method
@@ -704,7 +706,7 @@ const AdminPanel = () => {
 
   const handleDelete = async (id, productType) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/products/${productType}/${id}`, {
+      const response = await fetch(`http://localhost:4000/api/admin/products/${productType}/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
@@ -730,7 +732,7 @@ const AdminPanel = () => {
     setCountdown(newCountdown);
 
     try {
-      const response = await fetch("http://localhost:5000/api/admin/login", {
+      const response = await fetch("http://localhost:4000/api/admin/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -774,7 +776,7 @@ const AdminPanel = () => {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+      const response = await fetch(`http://localhost:4000/api/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -800,7 +802,7 @@ const AdminPanel = () => {
 
   const updateDeliveryDate = async (orderId, newDate) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/orders/${orderId}/delivery-date`, {
+      const response = await fetch(`http://localhost:4000/api/orders/${orderId}/delivery-date`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -827,7 +829,7 @@ const AdminPanel = () => {
 
   const updateOrderState = async (orderId, action) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/orders/${orderId}/state`, {
+      const response = await fetch(`http://localhost:4000/api/orders/${orderId}/state`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -896,7 +898,7 @@ const AdminPanel = () => {
     e.preventDefault();
 
     try {
-      const response = await fetch("http://localhost:5000/api/send-message", {
+      const response = await fetch("http://localhost:4000/api/send-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -911,7 +913,7 @@ const AdminPanel = () => {
         setRecipient("");
         setSubject("");
         setMessage("");
-        const historyResponse = await fetch("http://localhost:5000/api/message-history");
+        const historyResponse = await fetch("http://localhost:4000/api/message-history");
         setMessageHistory(await historyResponse.json());
       } else {
         console.error("Failed to send message.");
@@ -952,7 +954,7 @@ const AdminPanel = () => {
   const handleDeletedeviceinformation = async () => {
     try {
       // Make a DELETE request to the backend to delete all device information
-      const response = await fetch('http://localhost:5000/api/admin/device-info', { method: 'DELETE' });
+      const response = await fetch('http://localhost:4000/api/admin/device-info', { method: 'DELETE' });
 
       if (response.ok) {
         // If the deletion is successful, update the state to clear device info
@@ -971,7 +973,7 @@ const AdminPanel = () => {
   const handleDeletelocationinformation = async () => {
     try {
       // Make a DELETE request to the backend to delete all location information
-      const response = await fetch('http://localhost:5000/api/admin/location-info', { method: 'DELETE' });
+      const response = await fetch('http://localhost:4000/api/admin/location-info', { method: 'DELETE' });
 
       if (response.ok) {
         // If the deletion is successful, update the state to clear location info
@@ -1004,7 +1006,7 @@ const AdminPanel = () => {
     }
 
     try {
-      const response = await fetch("http://localhost:5000/api/admin/orders/delete", {
+      const response = await fetch("http://localhost:4000/api/admin/orders/delete", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -1021,6 +1023,24 @@ const AdminPanel = () => {
       }
     } catch (error) {
       console.error("Error deleting orders:", error);
+    }
+  };
+
+  // Function to delete all login history
+  const deleteAllLoginHistory = async () => {
+    try {
+      const response = await fetch("http://localhost:4000/api/admin/clear-login-history", {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        alert("All login history has been deleted.");
+        setLoginHistory([]); // Clear login history from state
+      } else {
+        console.error("Failed to delete login history");
+      }
+    } catch (error) {
+      console.error("Error deleting login history:", error);
     }
   };
 
@@ -1101,6 +1121,9 @@ const AdminPanel = () => {
               ) : (
                 <p className="text-red-500">Loading dashboard stats...</p>
               )}
+
+              {/* Add Dashboard Graphs Here */}
+              <DashboardGraphs />
             </section>
 
             {/* Countdown Timer and log out */}
@@ -1169,7 +1192,21 @@ const AdminPanel = () => {
                         </thead>
                         <tbody>
                           {filteredOrders.map((order) => (
-                            <tr key={order._id} className="bg-gray-700 hover:bg-gray-600 transition">
+                            <tr
+                              key={order._id}
+                              className={`transition ${order.status === "Pending"
+                                  ? "bg-red-500 hover:bg-red-600" // Red for Pending
+                                  : order.status === "Processing"
+                                    ? "bg-yellow-500 hover:bg-yellow-600" // Yellow for Processing
+                                    : order.status === "Shipped"
+                                      ? "bg-blue-500 hover:bg-blue-600" // Blue for Shipped
+                                      : order.status === "Delivered"
+                                        ? "bg-green-500 hover:bg-green-600" // Green for Delivered
+                                        : order.status === "Cancelled"
+                                          ? "bg-gray-500 hover:bg-gray-600" // Gray for Cancelled
+                                          : "bg-gray-700 hover:bg-gray-600" // Default color
+                                }`}
+                            >
                               {/* Select Checkbox */}
                               <td className="py-2 px-4 text-center">
                                 <input
@@ -1442,1225 +1479,817 @@ const AdminPanel = () => {
                 />
               </div>
 
-              <div className="bg-gray-800 p-6 rounded-md shadow-md grid grid-cols-1 gap-6 md:grid-cols-2  justify-items-center">
-
+              <div className="bg-gray-800 p-6 rounded-md shadow-md grid grid-cols-1 gap-6 md:grid-cols-2 justify-items-center">
                 {/* Product List for Pre-Built PCs */}
-                <div className="bg-gray-800 p-6 rounded-md shadow-lg w-full max-w-full md:max-w-lg">
-                  <h3 className="text-xl font-medium mb-4">Pre-Built PCs</h3>
-                  {Array.isArray(filteredPreBuiltPCs) && filteredPreBuiltPCs.length > 0 ? (
-                    <>
-                      {/* Show total number of products */}
-                      <p className="text-gray-300 mb-4">Total Products: {products.filter((product) => product.type === "Pre-Built PC").length}</p>
-                      <ul className="space-y-4" style={{ maxHeight: 'calc(3 * 10rem)', overflowY: 'auto' }}>
-                        {filteredPreBuiltPCs.filter((product) => product.type === "Pre-Built PC")
-                          .map((product) => (
-                            <li
-                              key={product._id}
-                              className="p-4 bg-gray-700 rounded-md flex flex-col md:flex-row justify-between items-center space-x-0 md:space-x-4 space-y-4 md:space-y-0"
-                              onClick={() => {
-                                const formattedDate = product.dateAdded.split("T")[0];
-                                const processedImage = Array.isArray(product.image)
-                                  ? product.image.map((img) =>
-                                    img.includes("uploads")
-                                      ? `http://localhost:5000/uploads/${img.split("\\").pop()}`
-                                      : img // Retain valid URLs
-                                  )
-                                  : [];
+                {categories && categories.length > 0 ? (
+                  categories.map((category) => {
+                    // Ensure products is an array before filtering
+                    const filteredProducts = Array.isArray(products)
+                      ? products.filter(product =>
+                        product.type === category &&
+                        (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          product.code.toLowerCase().includes(searchTerm.toLowerCase()))
+                      )
+                      : [];
 
-                                setSelectedProduct({
-                                  id: product._id,
-                                  name: product.name,
-                                  price: product.price,
-                                  image: product.image,
-                                  originalPrice: product.originalPrice,
-                                  brand: product.brand,
-                                  category: product.category,
-                                  description: product.description,
-                                  stock: product.stock,
-                                  code: product.code,
-                                  discount: product.discount,
-                                  bonuses: product.bonuses,
-                                  dateAdded: formattedDate,
-                                  popularity: product.popularity,
-                                  otherTechnicalDetails: product.otherTechnicalDetails,
-                                  notes: product.notes,
-                                  condition: product.condition,
-                                  cpu: product.specs.cpu,
-                                  graphiccard: product.specs.graphiccard,
-                                  platform: product.specs.platform,
-                                  motherboard: product.specs.motherboard,
-                                  ramOptions: Array.isArray(product.specs.ramOptions)
-                                    ? product.specs.ramOptions
-                                    : [],
-                                  storage1Options: Array.isArray(product.specs.storage1Options)
-                                    ? product.specs.storage1Options
-                                    : [],
-                                  storage2Options: Array.isArray(product.specs.storage2Options)
-                                    ? product.specs.storage2Options
-                                    : [],
-                                  liquidcooler: product.specs.liquidcooler,
-                                  smps: product.specs.smps,
-                                  cabinet: product.specs.cabinet,
-                                  type: 'Pre-Built PC',
-                                });
-                              }}
-                            >
-                              <div className="flex-shrink-0">
-                                {product.image && Array.isArray(product.image) && product.image.length > 0 && (
-                                  <img
-                                    src={`http://localhost:5000/uploads/${product.image[0].split('\\').pop()}`}
-                                    alt={product.name}
-                                    loading="lazy"
-                                    className="w-16 h-16 object-cover rounded-md"
-                                  />
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <h3 className="text-md font-semibold text-white">{product.type}</h3>
-                                <h4 className="text-lg font-semibold text-white">{product.name}</h4>
-                                <p className="text-sm text-gray-300">{product.description}</p>
-                                <p className="text-sm font-medium text-green-400">Price: ₹{product.price}</p>
-                                <p className="text-sm text-gray-400">Category: {product.category}</p>
-                              </div>
-                              <div className="space-x-2">
-                                <button
-                                  onClick={() => {
-                                    const formattedDate = product.dateAdded.split("T")[0];
-                                    const processedImage = Array.isArray(product.image)
-                                      ? product.image.map((img) =>
-                                        img.includes("uploads")
-                                          ? `http://localhost:5000/uploads/${img.split("\\").pop()}`
-                                          : img // Retain valid URLs
-                                      )
-                                      : [];
+                    return (
+                      <div key={category} className="bg-gray-800 p-6 rounded-md shadow-lg w-full max-w-full md:max-w-lg">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-xl font-medium mb-4">{category}</h3>
 
-                                    // console.log("Product Object: ", product);
-
-                                    // console.log("INSTOCK", product.inStock)
-
-                                    setFormData({
-                                      id: product._id,
-                                      name: product.name,
-                                      price: product.price,
-                                      image: product.image,
-                                      originalPrice: product.originalPrice,
-                                      brand: product.brand,
-                                      category: product.category,
-                                      description: product.description,
-                                      stock: product.inStock ? "yes" : "no",
-                                      code: product.code,
-                                      discount: product.discount,
-                                      bonuses: product.bonuses,
-                                      dateAdded: formattedDate,
-                                      popularity: product.popularity,
-                                      otherTechnicalDetails: product.otherTechnicalDetails,
-                                      notes: product.notes,
-                                      condition: product.condition,
-                                      cpu: product.specs.cpu,
-                                      graphiccard: product.specs.graphiccard,
-                                      platform: product.specs.platform,
-                                      motherboard: product.specs.motherboard,
-                                      ramOptions: Array.isArray(product.specs.ramOptions) ? product.specs.ramOptions : [],
-                                      storage1Options: Array.isArray(product.specs.storage1Options) ? product.specs.storage1Options : [],
-                                      storage2Options: Array.isArray(product.specs.storage2Options) ? product.specs.storage2Options : [],
-                                      liquidcooler: product.specs.liquidcooler,
-                                      smps: product.specs.smps,
-                                      cabinet: product.specs.cabinet,
-                                      type: 'Pre-Built PC',
-                                    })
-                                    setImagePreview(processedImage);
-                                    setIsEditing(true)
-                                  }}
-                                  className="py-1 px-3 bg-indigo-500 text-gray-900 rounded-md hover:bg-indigo-600 transition"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(product._id, 'prebuild')}
-                                  className="py-1 px-3 bg-red-500 text-gray-900 rounded-md hover:bg-red-600 transition"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                      </ul>
-                    </>
-                  ) : (
-                    <p className="text-gray-400">No products available.</p>
-                  )}
-                </div>
-
-                {/* Display Product Details in Large Format */}
-                {selectedProduct && selectedProduct.specs && (
-                  <div className="fixed inset-0 bg-gray-800 bg-opacity-70 flex justify-center items-center z-50">
-                    <div className="bg-white p-6 rounded-md max-w-4xl w-full">
-                      <button
-                        onClick={() => setSelectedProduct(null)}
-                        className="text-red-500 font-bold absolute top-4 right-4"
-                      >
-                        Close
-                      </button>
-                      <div className="flex flex-col md:flex-row">
-                        <div className="flex-shrink-0">
-                          {selectedProduct.image && selectedProduct.image.length > 0 && (
-                            <img
-                              src={`http://localhost:5000/uploads/${selectedProduct.image[0].split('\\').pop()}`}
-                              alt={selectedProduct.name}
-                              loading="lazy"
-                              className="w-48 h-48 object-cover rounded-md"
-                            />
-                          )}
-                        </div>
-                        <div className="ml-4 flex-1">
-                          <h3 className="text-2xl font-semibold text-gray-900">{selectedProduct.name}</h3>
-                          <p className="text-lg text-gray-700">{selectedProduct.description}</p>
-                          <p className="text-xl font-medium text-green-500">Price: ₹{selectedProduct.price}</p>
-                          <p className="text-md text-gray-600">Category: {selectedProduct.category}</p>
-                          <p className="text-md text-gray-600">Brand: {selectedProduct.brand}</p>
-                          <p className="text-md text-gray-600">Stock: {selectedProduct.stock}</p>
-                          <p className="text-md text-gray-600">Code: {selectedProduct.code}</p>
-                          <p className="text-md text-gray-600">Discount: {selectedProduct.discount}%</p>
-                          <p className="text-md text-gray-600">Condition: {selectedProduct.condition}</p>
-
-                          {/* Additional Technical Details */}
-                          <div className="mt-4">
-                            <h4 className="text-lg font-semibold text-gray-800">Technical Details:</h4>
-                            <ul className="space-y-2">
-                              {selectedProduct.specs.cpu && <li><strong>CPU:</strong> {selectedProduct.specs.cpu}</li>}
-                              {selectedProduct.specs.graphiccard && <li><strong>Graphics Card:</strong> {selectedProduct.specs.graphiccard}</li>}
-                              {selectedProduct.specs.platform && <li><strong>Platform:</strong> {selectedProduct.specs.platform}</li>}
-                              {selectedProduct.specs.motherboard && <li><strong>Motherboard:</strong> {selectedProduct.specs.motherboard}</li>}
-                              {selectedProduct.specs.ramOptions && selectedProduct.specs.ramOptions.length > 0 && (
-                                <li><strong>RAM Options:</strong> {selectedProduct.specs.ramOptions.join(', ')}</li>
-                              )}
-                              {selectedProduct.specs.storage1Options && selectedProduct.specs.storage1Options.length > 0 && (
-                                <li><strong>Storage Options:</strong> {selectedProduct.specs.storage1Options.join(', ')}</li>
-                              )}
-                              {selectedProduct.specs.storage2Options && selectedProduct.specs.storage2Options.length > 0 && (
-                                <li><strong>Secondary Storage:</strong> {selectedProduct.specs.storage2Options.join(', ')}</li>
-                              )}
-                              {selectedProduct.specs.liquidcooler && <li><strong>Liquid Cooler:</strong> {selectedProduct.specs.liquidcooler}</li>}
-                              {selectedProduct.specs.smps && <li><strong>SMPS:</strong> {selectedProduct.specs.smps}</li>}
-                              {selectedProduct.specs.cabinet && <li><strong>Cabinet:</strong> {selectedProduct.specs.cabinet}</li>}
-                            </ul>
+                          {/* Add/Edit Product Form */}
+                          <div className="relative bg-gray-800 p-6 rounded-lg shadow-lg w-36 h-16 md:w-40 md:h-18 flex justify-center items-center border border-gray-700 hover:shadow-indigo-500/50 transition duration-300 ease-in-out transform hover:scale-105">
+                            {!isEditing && (
+                              <button
+                                onClick={() => {
+                                  setIsEditing(true) // Reset form for adding new product
+                                  setFormData({  // Clear the form data when adding a new product
+                                    id: null,
+                                    type: "",
+                                    name: "",
+                                    price: "",
+                                    category: "",
+                                    description: "",
+                                    image: null,
+                                    ramOptions: [{ value: "", price: "" }],
+                                    storage1Options: [{ value: "", price: "" }],
+                                    storage2Options: [{ value: "", price: "" }],
+                                    otherTechnicalDetails: [{ name: "", value: "" }],
+                                    notes: [""],
+                                  });
+                                }}
+                                className="bg-indigo-500 text-white p-4 w-10 h-10 rounded-full flex justify-center items-center text-3xl font-bold hover:bg-indigo-600 transition transform hover:scale-110 hover:shadow-indigo-500/50 shadow-lg"
+                              >
+                                +
+                              </button>
+                            )}
                           </div>
+                        </div>
+                        {filteredProducts.length > 0 ? (
+                          <>
+                            {/* Show total number of products */}
+                            <p className="text-gray-300 mb-4">Total Products: {filteredProducts.length}</p>
+                            <ul className="space-y-4" style={{ maxHeight: 'calc(3 * 10rem)', overflowY: 'auto' }}>
+                              {filteredProducts.map((product) => (
+                                <li
+                                  key={product._id}
+                                  className="p-4 bg-gray-700 rounded-md flex flex-col md:flex-row justify-between items-center space-x-0 md:space-x-4 space-y-4 md:space-y-0"
+                                >
+                                  <div className="flex-shrink-0">
+                                    {product.image && Array.isArray(product.image) && product.image.length > 0 && (
+                                      <img
+                                        src={`http://localhost:4000/uploads/${product.image[0].split('\\').pop()}`}
+                                        alt={product.name}
+                                        loading="lazy"
+                                        className="w-16 h-16 object-cover rounded-md"
+                                      />
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <h3 className="text-md font-semibold text-white">{product.type}</h3>
+                                    <h4 className="text-lg font-semibold text-white">{product.name}</h4>
+                                    <p className="text-sm text-gray-300">{product.description}</p>
+                                    <p className="text-sm font-medium text-green-400">Price: ₹{product.price}</p>
+                                    <p className="text-sm text-gray-400">Category: {product.category}</p>
+                                  </div>
+                                  <div className="space-x-2">
+                                    <button
+                                      onClick={() => {
+                                        const formattedDate = product.dateAdded.split("T")[0];
+                                        const processedImage = Array.isArray(product.image)
+                                          ? product.image.map((img) =>
+                                            img.includes("uploads")
+                                              ? `http://localhost:4000/uploads/${img.split("\\").pop()}`
+                                              : img // Retain valid URLs
+                                          )
+                                          : [];
 
-                          {/* Other Information */}
-                          {selectedProduct.otherTechnicalDetails && (
-                            <div className="mt-4">
-                              <h4 className="text-lg font-semibold text-gray-800">Other Technical Details:</h4>
-                              <p className="text-gray-600">{selectedProduct.otherTechnicalDetails}</p>
-                            </div>
-                          )}
+                                        setFormData({
+                                          id: product._id,
+                                          name: product.name,
+                                          price: product.price,
+                                          image: product.image,
+                                          originalPrice: product.originalPrice,
+                                          brand: product.brand,
+                                          category: product.category,
+                                          description: product.description,
+                                          stock: product.inStock ? "yes" : "no",
+                                          code: product.code,
+                                          discount: product.discount,
+                                          bonuses: product.bonuses,
+                                          dateAdded: formattedDate,
+                                          popularity: product.popularity,
+                                          otherTechnicalDetails: product.otherTechnicalDetails,
+                                          notes: product.notes,
+                                          condition: product.condition,
+                                          cpu: product.specs.cpu,
+                                          graphiccard: product.specs.graphiccard,
+                                          graphiccard: product.specs.GraphicCard,
+                                          display: product.specs.display,
+                                          os: product.specs.os,
+                                          platform: product.specs.platform,
+                                          motherboard: product.specs.motherboard,
+                                          ram: product.specs.ram,
+                                          ramOptions: Array.isArray(product.specs.ramOptions) ? product.specs.ramOptions : [],
+                                          storage: product.specs.storage,
+                                          storage1Options: Array.isArray(product.specs.storage1Options) ? product.specs.storage1Options : [],
+                                          storage2Options: Array.isArray(product.specs.storage2Options) ? product.specs.storage2Options : [],
+                                          liquidcooler: product.specs.liquidcooler,
+                                          smps: product.specs.smps,
+                                          cabinet: product.specs.cabinet,
+                                          type: product.type,
+                                        })
+                                        setImagePreview(processedImage);
+                                        setIsEditing(true)
+                                      }}
+                                      className="py-1 px-3 bg-indigo-500 text-gray-900 rounded-md hover:bg-indigo-600 transition"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(product._id, 'prebuild')}
+                                      className="py-1 px-3 bg-red-500 text-gray-900 rounded-md hover:bg-red-600 transition"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        ) : (
+                          <p className="text-gray-400">No products available.</p>
+                        )}
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-gray-400">No categories available.</p>
+                )}
+              </div>
+            </section>
 
-                          {/* Notes Section */}
-                          {selectedProduct.notes && (
-                            <div className="mt-4">
-                              <h4 className="text-lg font-semibold text-gray-800">Notes:</h4>
-                              <p className="text-gray-600">{selectedProduct.notes}</p>
+            {isEditing && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50">
+                <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full flex flex-col justify-between h-[90vh]">
+                  <h3 className="text-xl font-medium mb-4">{formData.id ? "Edit Product" : "Add Product"}</h3>
+                  {/* Cancel Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)} // Cancel the editing process
+                    className="py-2 px-4 mb-4 bg-red-500 text-white font-semibold rounded-md hover:bg-red-600 transition"
+                  >
+                    Cancel
+                  </button>
+                  <form onSubmit={handleProductSubmit} encType="multipart/form-data" className="flex-grow flex flex-col space-y-4 overflow-y-auto">
+                    {/* Product Type Dropdown */}
+                    <div>
+                      <label className="block text-sm mb-1">Product Type</label>
+                      <select
+                        name="type"
+                        value={formData.type || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                        required
+                      >
+                        <option value="" disabled>Select Product Type</option>
+                        <option value="Pre-Built PC">Pre-Built PC</option>
+                        <option value="Office PC">Office PC</option>
+                        <option value="Refurbished Laptop">Refurbished Laptop</option>
+                        <option value="Mini PC">Mini PC</option>
+                      </select>
+                    </div>
+
+                    {/* Product Name */}
+                    <div>
+                      <label className="block text-sm mb-1">Product Name</label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                        required
+                      />
+                    </div>
+
+                    {/* Product Image */}
+                    <div>
+                      <label className="block text-sm mb-1">Product Image</label>
+                      <input
+                        type="file"
+                        name="image"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                        multiple
+                      />
+                      {imagePreview && imagePreview.length > 0 && (
+                        <div className="mt-4 flex flex-wrap">
+                          {imagePreview.map((preview, index) => (
+                            <div key={index} className="relative mb-1 mr-2">
+                              {/* Cancel button */}
+                              <button
+                                type="button"
+                                onClick={() => handleImageRemove(index)} // Remove the image
+                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs"
+                              >
+                                X
+                              </button>
+                              <img
+                                key={index}
+                                src={preview}
+                                alt={`Preview ${index + 1}`}
+                                loading="lazy"
+                                className="max-w-xs max-h-32 mr-2 mb-1"
+                              />
                             </div>
-                          )}
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Price */}
+                    <div>
+                      <label className="block text-sm mb-1">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={formData.price || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                        required
+                      />
+                    </div>
+
+                    {/* original price */}
+                    <div>
+                      <label className="block text-sm mb-1 text-white">Original Price</label>
+                      <input
+                        type="number"
+                        name="originalPrice"
+                        value={formData.originalPrice || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
+
+                    {/* brand */}
+                    <div>
+                      <label className="block text-sm mb-1">Brand</label>
+                      <input
+                        type="text"
+                        name="brand"
+                        value={formData.brand || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <label className="block text-sm mb-1">Category</label>
+                      <input
+                        type="text"
+                        name="category"
+                        value={formData.category || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="block text-sm mb-1">Description</label>
+                      <textarea
+                        name="description"
+                        value={formData.description || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
+
+                    {/* stock */}
+                    <div>
+                      <label className="block text-sm mb-1">Stock</label>
+                      <div className="flex items-center space-x-4">
+                        <div>
+                          <label htmlFor="stockYes" className="mr-2 text-sm">Yes</label>
+                          <input
+                            type="radio"
+                            id="stockYes"
+                            name="stock"
+                            value="yes"
+                            checked={formData.stock === "yes"}
+                            onChange={handleFormChange}
+                            className="text-indigo-400"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="stockNo" className="mr-2 text-sm">No</label>
+                          <input
+                            type="radio"
+                            id="stockNo"
+                            name="stock"
+                            value="no"
+                            checked={formData.stock === "no"}
+                            onChange={handleFormChange}
+                            className="text-indigo-400"
+                          />
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Product List for Refurbished Laptops */}
-                <div className="bg-gray-800 p-6 rounded-md shadow-lg w-full max-w-full md:max-w-lg">
-                  <h3 className="text-xl font-medium mb-4">Refurbished Laptops</h3>
-                  {Array.isArray(filteredRefurbishedLaptops) && filteredRefurbishedLaptops.length > 0 ? (
-                    <>
-                      {/* Show total number of products */}
-                      <p className="text-gray-300 mb-4">Total Products: {products.filter((product) => product.type === "Refurbished Laptop").length}</p>
-                      <ul className="space-y-4" style={{ maxHeight: 'calc(3 * 10rem)', overflowY: 'auto' }}>
-                        {filteredRefurbishedLaptops.filter((product) => product.type === "Refurbished Laptop")
-                          .map((product) => (
-                            <li
-                              key={product._id}
-                              className="p-4 bg-gray-700 rounded-md flex flex-col md:flex-row justify-between items-center space-x-0 md:space-x-4 space-y-4 md:space-y-0"
-                            >
-                              <div className="flex-shrink-0">
-                                {product.image && Array.isArray(product.image) && product.image.length > 0 && (
-                                  <img
-                                    src={`http://localhost:5000/uploads/${product.image[0].split('\\').pop()}`}
-                                    alt={product.name}
-                                    loading="lazy"
-                                    className="w-16 h-16 object-cover rounded-md"
-                                  />
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <h3 className="text-md font-semibold text-white">{product.type}</h3>
-                                <h4 className="text-lg font-semibold text-white">{product.name}</h4>
-                                <p className="text-sm text-gray-300">{product.description}</p>
-                                <p className="text-sm font-medium text-green-400">Price: ₹{product.price}</p>
-                                <p className="text-sm text-gray-400">Category: {product.category}</p>
-                              </div>
-                              <div className="space-x-2">
-                                <button
-                                  onClick={() => {
-                                    const formattedDate = product.dateAdded.split("T")[0];
-                                    const processedImage = Array.isArray(product.image)
-                                      ? product.image.map((img) =>
-                                        img.includes("uploads")
-                                          ? `http://localhost:5000/uploads/${img.split("\\").pop()}`
-                                          : img // Retain valid URLs
-                                      )
-                                      : [];
+                    {/* code */}
+                    <div>
+                      <label className="block text-sm mb-1 text-white">Code</label>
+                      <input
+                        type="text"
+                        name="code"
+                        value={formData.code || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
 
-                                    setFormData({
-                                      id: product._id,
-                                      name: product.name,
-                                      price: product.price,
-                                      image: product.image,
-                                      originalPrice: product.originalPrice,
-                                      brand: product.brand,
-                                      category: product.category,
-                                      description: product.description,
-                                      stock: product.inStock ? "yes" : "no",
-                                      code: product.code,
-                                      discount: product.discount,
-                                      bonuses: product.bonuses,
-                                      dateAdded: formattedDate,
-                                      popularity: product.popularity,
-                                      otherTechnicalDetails: product.otherTechnicalDetails,
-                                      notes: product.notes,
-                                      condition: product.condition,
-                                      cpu: product.specs.cpu,
-                                      graphiccard: product.specs.GraphicCard,
-                                      ram: product.specs.ram,
-                                      storage: product.specs.storage,
-                                      display: product.specs.display,
-                                      os: product.specs.os,
-                                      type: 'Refurbished Laptop',
-                                    })
-                                    setImagePreview(processedImage)
-                                    setIsEditing(true)
-                                  }}
-                                  className="py-1 px-3 bg-indigo-500 text-gray-900 rounded-md hover:bg-indigo-600 transition"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(product._id, 'refurbished')}
-                                  className="py-1 px-3 bg-red-500 text-gray-900 rounded-md hover:bg-red-600 transition"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                      </ul>
-                    </>
-                  ) : (
-                    <p className="text-gray-400">No products available.</p>
-                  )}
-                </div>
+                    {/* discount */}
+                    <div>
+                      <label className="block text-sm mb-1 text-white">Discount</label>
+                      <input
+                        type="number"
+                        name="discount"
+                        value={formData.discount || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
 
-                {/* Product List for Mini PC */}
-                <div className="bg-gray-800 p-6 rounded-md shadow-lg w-full max-w-full md:max-w-lg">
-                  <h3 className="text-xl font-medium mb-4">Mini PCs</h3>
-                  {Array.isArray(filteredMiniPCs) && filteredMiniPCs.length > 0 ? (
-                    <>
-                      {/* Show total number of products */}
-                      <p className="text-gray-300 mb-4">Total Products: {products.filter((product) => product.type === "Mini PC").length}</p>
-                      <ul className="space-y-4" style={{ maxHeight: 'calc(3 * 10rem)', overflowY: 'auto' }}>
-                        {filteredMiniPCs.filter((product) => product.type === "Mini PC")
-                          .map((product) => (
-                            <li
-                              key={product._id}
-                              className="p-4 bg-gray-700 rounded-md flex flex-col md:flex-row justify-between items-center space-x-0 md:space-x-4 space-y-4 md:space-y-0"
-                            >
-                              <div className="flex-shrink-0">
-                                {product.image && Array.isArray(product.image) && product.image.length > 0 && (
-                                  <img
-                                    src={`http://localhost:5000/uploads/${product.image[0].split('\\').pop()}`}
-                                    alt={product.name}
-                                    loading="lazy"
-                                    className="w-16 h-16 object-cover rounded-md"
-                                  />
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <h3 className="text-md font-semibold text-white">{product.type}</h3>
-                                <h4 className="text-lg font-semibold text-white">{product.name}</h4>
-                                <p className="text-sm text-gray-300">{product.description}</p>
-                                <p className="text-sm font-medium text-green-400">Price: ₹{product.price}</p>
-                                <p className="text-sm text-gray-400">Category: {product.category}</p>
-                              </div>
-                              <div className="space-x-2">
-                                <button
-                                  onClick={() => {
-                                    const formattedDate = product.dateAdded.split("T")[0];
-                                    const processedImage = Array.isArray(product.image)
-                                      ? product.image.map((img) =>
-                                        img.includes("uploads")
-                                          ? `http://localhost:5000/uploads/${img.split("\\").pop()}`
-                                          : img // Retain valid URLs
-                                      )
-                                      : [];
+                    {/* bonuses */}
+                    <div>
+                      <label className="block text-sm mb-1 text-white">Bonuses</label>
+                      <textarea
+                        name="bonuses"
+                        placeholder="e.g., free accessories, extended warranty"
+                        value={formData.bonuses || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
 
-                                    // console.log("Product Object: ", product);
+                    {/* date added */}
+                    <div>
+                      <label className="block text-sm mb-1">Product Date</label>
+                      <input
+                        type="date"
+                        name="dateAdded"
+                        value={formData.dateAdded || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
 
-                                    setFormData({
-                                      id: product._id,
-                                      name: product.name,
-                                      price: product.price,
-                                      image: product.image,
-                                      originalPrice: product.originalPrice,
-                                      brand: product.brand,
-                                      category: product.category,
-                                      description: product.description,
-                                      stock: product.inStock ? "yes" : "no",
-                                      code: product.code,
-                                      discount: product.discount,
-                                      bonuses: product.bonuses,
-                                      dateAdded: formattedDate,
-                                      popularity: product.popularity,
-                                      otherTechnicalDetails: product.otherTechnicalDetails,
-                                      notes: product.notes,
-                                      condition: product.condition,
-                                      cpu: product.specs.cpu,
-                                      graphiccard: product.specs.graphiccard,
-                                      platform: product.specs.platform,
-                                      motherboard: product.specs.motherboard,
-                                      ramOptions: Array.isArray(product.specs.ramOptions) ? product.specs.ramOptions : [],
-                                      storage1Options: Array.isArray(product.specs.storage1Options) ? product.specs.storage1Options : [],
-                                      smps: product.specs.smps,
-                                      cabinet: product.specs.cabinet,
-                                      type: 'Mini PC',
-                                    })
-                                    setImagePreview(processedImage);
-                                    setIsEditing(true)
-                                  }}
-                                  className="py-1 px-3 bg-indigo-500 text-gray-900 rounded-md hover:bg-indigo-600 transition"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(product._id, 'prebuild')}
-                                  className="py-1 px-3 bg-red-500 text-gray-900 rounded-md hover:bg-red-600 transition"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                      </ul>
-                    </>
-                  ) : (
-                    <p className="text-gray-400">No products available.</p>
-                  )}
-                </div>
+                    {/* popularity */}
+                    <div>
+                      <label className="block text-sm mb-1">Popularity</label>
+                      <input
+                        type="number"
+                        name="popularity"
+                        value={formData.popularity || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
 
-                {/* Add/Edit Product Form */}
-                <div className="relative bg-gray-700 p-6 rounded-md shadow-md w-auto md:w-1/3">
-                  {!isEditing && (
-                    <button
-                      onClick={() => {
-                        setIsEditing(true) // Reset form for adding new product
-                        setFormData({  // Clear the form data when adding a new product
-                          id: null,
-                          type: "",
-                          name: "",
-                          price: "",
-                          category: "",
-                          description: "",
-                          image: null,
-                          ramOptions: [{ value: "", price: "" }],
-                          storage1Options: [{ value: "", price: "" }],
-                          storage2Options: [{ value: "", price: "" }],
-                          otherTechnicalDetails: [{ name: "", value: "" }],
-                          notes: [""],
-                        });
-                      }}
-                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-indigo-500 text-white p-4 rounded-full flex justify-center items-center text-3xl font-bold hover:bg-indigo-600 transition"
-                    >
-                      +
-                    </button>
-                  )}
+                    {/* Condition */}
+                    <div>
+                      <label className="block text-sm mb-1">Condition</label>
+                      <input
+                        type="text"
+                        name="condition"
+                        value={formData.condition || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
 
-                  {isEditing && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50">
-                      <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full flex flex-col justify-between h-[90vh]">
-                        <h3 className="text-xl font-medium mb-4">{formData.id ? "Edit Product" : "Add Product"}</h3>
-                        {/* Cancel Button */}
-                        <button
-                          type="button"
-                          onClick={() => setIsEditing(false)} // Cancel the editing process
-                          className="py-2 px-4 mb-4 bg-red-500 text-white font-semibold rounded-md hover:bg-red-600 transition"
-                        >
-                          Cancel
-                        </button>
-                        <form onSubmit={handleProductSubmit} encType="multipart/form-data" className="flex-grow flex flex-col space-y-4 overflow-y-auto">
-                          {/* Product Type Dropdown */}
-                          <div>
-                            <label className="block text-sm mb-1">Product Type</label>
-                            <select
-                              name="type"
-                              value={formData.type || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                              required
-                            >
-                              <option value="" disabled>Select Product Type</option>
-                              <option value="Pre-Built PC">Pre-Built PC</option>
-                              <option value="Refurbished Laptop">Refurbished Laptop</option>
-                              <option value="Mini PC">Mini PC</option>
-                            </select>
-                          </div>
+                    {/* cpu */}
+                    <div>
+                      <label className="block text-sm mb-1">CPU</label>
+                      <input
+                        type="text"
+                        name="cpu"
+                        placeholder="e.g., Intel i5, Ryzen 7"
+                        value={formData.cpu || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
 
-                          {/* Product Name */}
-                          <div>
-                            <label className="block text-sm mb-1">Product Name</label>
+                    {/* graphic card */}
+                    <div>
+                      <label className="block text-sm mb-1">Graphic Card</label>
+                      <input
+                        type="text"
+                        name="graphiccard"
+                        placeholder="e.g., Arc A380 - Intel 6GB"
+                        value={formData.graphiccard || ""}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                      />
+                    </div>
+
+                    {/* Additional Fields for Mini PC */}
+                    {["Mini PC", "Pre-Built PC", "Office PC"].includes(formData.type) && (
+                      <>
+                        {/* platform */}
+                        <div>
+                          <label className="block text-sm mb-1">PlatForm</label>
+                          <input
+                            type="text"
+                            name="platform"
+                            placeholder="e.g., AMD, Intel"
+                            value={formData.platform || ""}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                          />
+                        </div>
+
+                        {/* mother board */}
+                        <div>
+                          <label className="block text-sm mb-1">Motherboard</label>
+                          <input
+                            type="text"
+                            name="motherboard"
+                            placeholder="e.g., MSI B450 Tomahawk"
+                            value={formData.motherboard || ""}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                          />
+                        </div>
+
+                        {/*  */}
+                        {["Mini PC", "Office PC"].includes(formData.type) && (
+                          <>
+                            {/* RAM Configurations */}
+                            <div>
+                              <label className="block text-sm mb-1">RAM</label>
+                              <input
+                                type="text"
+                                name="ram"
+                                placeholder="e.g., 8GB, 16GB"
+                                value={formData.ram || ""}
+                                onChange={handleFormChange}
+                                className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                              />
+                            </div>
+
+                            {/* Storage1 Configurations */}
+                            <div>
+                              <label className="block text-sm mb-1">Storage</label>
+                              <input
+                                type="text"
+                                name="storage"
+                                placeholder="e.g., 512GB SSD, 1TB HDD"
+                                value={formData.storage || ""}
+                                onChange={handleFormChange}
+                                className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {/* smps */}
+                        <div>
+                          <label className="block text-sm mb-1">SMPS</label>
+                          <input
+                            type="text"
+                            name="smps"
+                            placeholder="e.g., Deepcool - PK450D Bronze"
+                            value={formData.smps || ""}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                          />
+                        </div>
+
+                        {/* cabinet */}
+                        <div>
+                          <label className="block text-sm mb-1">Cabinet</label>
+                          <input
+                            type="text"
+                            name="cabinet"
+                            placeholder="e.g., NZXT H510"
+                            value={formData.cabinet || ""}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                          />
+                        </div>
+
+                        {/* Conditional Fields for Pre-Built PC */}
+                        {formData.type === "Pre-Built PC" && (
+                          <>
+                            {/* RAM Configurations */}
+                            <div>
+                              <h3 className="text-lg font-semibold mb-4">RAM Configurations</h3>
+                              {(formData.ramOptions || []).map((ram, index) => (
+                                <div key={index} className="grid grid-cols-2 gap-4 items-center mb-6">
+                                  <div>
+                                    <label className="block text-sm font-medium mb-1">RAM</label>
+                                    <input
+                                      type="text"
+                                      name="value"
+                                      placeholder="e.g., 8GB, 16GB"
+                                      value={ram.value || ""}
+                                      onChange={(e) => handleDynamicChange(e, index, "ramOptions")}
+                                      className="w-full px-4 py-2 bg-gray-700 text-indigo-400 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium mb-1">Price</label>
+                                    <input
+                                      type="number"
+                                      name={`ramPrice_${index}`}
+                                      placeholder="e.g., 14000"
+                                      value={ram.price || ""}
+                                      onChange={(e) => handleDynamicChange(e, index, "ramOptions")}
+                                      className="w-full px-4 py-2 bg-gray-700 text-indigo-400 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeField("ramOptions", index)}
+                                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => addField("ramOptions")}
+                                className="mt-4 px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
+                              >
+                                Add RAM Option
+                              </button>
+                            </div>
+
+                            {/* storage1 */}
+                            <div>
+                              <h3 className="text-lg font-semibold mb-2">Storage1 Configurations</h3>
+                              {formData.storage1Options?.map((storage, index) => (
+                                <div key={index} className="grid grid-cols-2 gap-4 items-center mb-4">
+                                  <div>
+                                    <label className="block text-sm mb-1">Storage1</label>
+                                    <input
+                                      type="text"
+                                      name={`storage1_${index}`}
+                                      placeholder="e.g., 512GB SSD, 1TB HDD"
+                                      value={storage.value || ""}
+                                      onChange={(e) => handleDynamicChange(e, index, "storage1Options")}
+                                      className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm mb-1">Price</label>
+                                    <input
+                                      type="number"
+                                      name={`storage1Price_${index}`}
+                                      placeholder="e.g., 14000"
+                                      value={storage.price || ""}
+                                      onChange={(e) => handleDynamicChange(e, index, "storage1Options")}
+                                      className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                                    />
+                                  </div>
+                                  <div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeField("storage1Options", index)}
+                                      className="px-4 py-2 bg-red-600 text-white rounded-md"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => addField("storage1Options")}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-md"
+                              >
+                                Add Storage 1 Option
+                              </button>
+                            </div>
+
+                            {/* storage2 */}
+                            <div>
+                              <h3 className="text-lg font-semibold mb-2">Storage2 Configurations</h3>
+                              {formData.storage2Options?.map((storage, index) => (
+                                <div key={index} className="grid grid-cols-2 gap-4 items-center mb-4">
+                                  <div>
+                                    <label className="block text-sm mb-1">Storage2</label>
+                                    <input
+                                      type="text"
+                                      name={`storage2_${index}`}
+                                      placeholder="e.g., 512GB SSD, 1TB HDD"
+                                      value={storage.value || ""}
+                                      onChange={(e) => handleDynamicChange(e, index, "storage2Options")}
+                                      className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm mb-1">Price</label>
+                                    <input
+                                      type="number"
+                                      name={`storage2Price_${index}`}
+                                      placeholder="e.g., 14000"
+                                      value={storage.price || ""}
+                                      onChange={(e) => handleDynamicChange(e, index, "storage2Options")}
+                                      className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                                    />
+                                  </div>
+                                  <div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeField("storage2Options", index)}
+                                      className="px-4 py-2 bg-red-600 text-white rounded-md"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => addField("storage2Options")}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-md"
+                              >
+                                Add Storage 2 Option
+                              </button>
+                            </div>
+
+                            {/* liquid cooler */}
+                            <div>
+                              <label className="block text-sm mb-1">Liquid Cooler</label>
+                              <input
+                                type="text"
+                                name="liquidcooler"
+                                placeholder="e.g., Cooler Master Hyper 212"
+                                value={formData.liquidcooler || ""}
+                                onChange={handleFormChange}
+                                className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                              />
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+
+                    {/* Additional Fields for Refurbished Laptop */}
+                    {formData.type === "Refurbished Laptop" && (
+                      <>
+
+                        {/* ram */}
+                        <div>
+                          <label className="block text-sm mb-1">RAM</label>
+                          <input
+                            type="text"
+                            name="ram"
+                            placeholder="e.g., 8GB, 16GB"
+                            value={formData.ram || ""}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                          />
+                        </div>
+
+                        {/* storage */}
+                        <div>
+                          <label className="block text-sm mb-1">Storage</label>
+                          <input
+                            type="text"
+                            name="storage"
+                            placeholder="e.g., 256GB SSD, 1TB HDD"
+                            value={formData.storage || ""}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                          />
+                        </div>
+
+                        {/* display */}
+                        <div>
+                          <label className="block text-sm mb-1">Display</label>
+                          <input
+                            type="text"
+                            name="display"
+                            placeholder="e.g., 15.6-inch FHD"
+                            value={formData.display || ""}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                          />
+                        </div>
+
+                        {/* os */}
+                        <div>
+                          <label className="block text-sm mb-1">Operating System</label>
+                          <input
+                            type="text"
+                            name="os"
+                            placeholder="e.g., Windows 10, Linux"
+                            value={formData.os || ""}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Other Technical Details Input Section */}
+                    <div className="mt-4">
+                      <h3 className="text-lg font-semibold text-indigo-400">Other Technical Details</h3>
+                      {formData.otherTechnicalDetails && formData.otherTechnicalDetails.length > 0
+                        ? formData.otherTechnicalDetails.map((detail, index) => (
+                          <div key={index} className="flex items-center gap-4 mb-2">
                             <input
                               type="text"
                               name="name"
-                              value={formData.name || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                              required
+                              placeholder="Detail Name (e.g., WIFI)"
+                              value={detail.name}
+                              onChange={(e) => handleOtherTechnicalDetailsChange(index, "name", e.target.value)}
+                              className="w-1/2 px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
                             />
-                          </div>
-
-                          {/* Product Image */}
-                          <div>
-                            <label className="block text-sm mb-1">Product Image</label>
-                            <input
-                              type="file"
-                              name="image"
-                              accept="image/*"
-                              onChange={handleImageChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                              multiple
-                            />
-                            {imagePreview && imagePreview.length > 0 && (
-                              <div className="mt-4 flex flex-wrap">
-                                {imagePreview.map((preview, index) => (
-                                  <div key={index} className="relative mb-1 mr-2">
-                                    {/* Cancel button */}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleImageRemove(index)} // Remove the image
-                                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs"
-                                    >
-                                      X
-                                    </button>
-                                    <img
-                                      key={index}
-                                      src={preview}
-                                      alt={`Preview ${index + 1}`}
-                                      loading="lazy"
-                                      className="max-w-xs max-h-32 mr-2 mb-1"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Price */}
-                          <div>
-                            <label className="block text-sm mb-1">Price</label>
-                            <input
-                              type="number"
-                              name="price"
-                              value={formData.price || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                              required
-                            />
-                          </div>
-
-                          {/* original price */}
-                          <div>
-                            <label className="block text-sm mb-1 text-white">Original Price</label>
-                            <input
-                              type="number"
-                              name="originalPrice"
-                              value={formData.originalPrice || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* brand */}
-                          <div>
-                            <label className="block text-sm mb-1">Brand</label>
                             <input
                               type="text"
-                              name="brand"
-                              value={formData.brand || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                              name="value"
+                              placeholder="Detail Value (e.g., 802.11ax Wi-Fi 6)"
+                              value={detail.value}
+                              onChange={(e) => handleOtherTechnicalDetailsChange(index, "value", e.target.value)}
+                              className="w-1/2 px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
                             />
-                          </div>
-
-                          {/* Category */}
-                          <div>
-                            <label className="block text-sm mb-1">Category</label>
-                            <input
-                              type="text"
-                              name="category"
-                              value={formData.category || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* Description */}
-                          <div>
-                            <label className="block text-sm mb-1">Description</label>
-                            <textarea
-                              name="description"
-                              value={formData.description || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* stock */}
-                          <div>
-                            <label className="block text-sm mb-1">Stock</label>
-                            <div className="flex items-center space-x-4">
-                              <div>
-                                <label htmlFor="stockYes" className="mr-2 text-sm">Yes</label>
-                                <input
-                                  type="radio"
-                                  id="stockYes"
-                                  name="stock"
-                                  value="yes"
-                                  checked={formData.stock === "yes"}
-                                  onChange={handleFormChange}
-                                  className="text-indigo-400"
-                                />
-                              </div>
-                              <div>
-                                <label htmlFor="stockNo" className="mr-2 text-sm">No</label>
-                                <input
-                                  type="radio"
-                                  id="stockNo"
-                                  name="stock"
-                                  value="no"
-                                  checked={formData.stock === "no"}
-                                  onChange={handleFormChange}
-                                  className="text-indigo-400"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* code */}
-                          <div>
-                            <label className="block text-sm mb-1 text-white">Code</label>
-                            <input
-                              type="text"
-                              name="code"
-                              value={formData.code || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* discount */}
-                          <div>
-                            <label className="block text-sm mb-1 text-white">Discount</label>
-                            <input
-                              type="number"
-                              name="discount"
-                              value={formData.discount || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* bonuses */}
-                          <div>
-                            <label className="block text-sm mb-1 text-white">Bonuses</label>
-                            <textarea
-                              name="bonuses"
-                              placeholder="e.g., free accessories, extended warranty"
-                              value={formData.bonuses || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* date added */}
-                          <div>
-                            <label className="block text-sm mb-1">Product Date</label>
-                            <input
-                              type="date"
-                              name="dateAdded"
-                              value={formData.dateAdded || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* popularity */}
-                          <div>
-                            <label className="block text-sm mb-1">Popularity</label>
-                            <input
-                              type="number"
-                              name="popularity"
-                              value={formData.popularity || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* Condition */}
-                          <div>
-                            <label className="block text-sm mb-1">Condition</label>
-                            <input
-                              type="text"
-                              name="condition"
-                              value={formData.condition || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* cpu */}
-                          <div>
-                            <label className="block text-sm mb-1">CPU</label>
-                            <input
-                              type="text"
-                              name="cpu"
-                              placeholder="e.g., Intel i5, Ryzen 7"
-                              value={formData.cpu || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* graphic card */}
-                          <div>
-                            <label className="block text-sm mb-1">Graphic Card</label>
-                            <input
-                              type="text"
-                              name="graphiccard"
-                              placeholder="e.g., Arc A380 - Intel 6GB"
-                              value={formData.graphiccard || ""}
-                              onChange={handleFormChange}
-                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                            />
-                          </div>
-
-                          {/* Additional Fields for Mini PC */}
-                          {formData.type === "Mini PC" && (
-                            <>
-                              {/* RAM Configurations */}
-                              <div>
-                                <h3 className="text-lg font-semibold mb-4">RAM Configurations</h3>
-                                {(formData.ramOptions || []).map((ram, index) => (
-                                  <div key={index} className="grid grid-cols-2 gap-4 items-center mb-6">
-                                    <div>
-                                      <label className="block text-sm font-medium mb-1">RAM</label>
-                                      <input
-                                        type="text"
-                                        name="value"
-                                        placeholder="e.g., 8GB, 16GB"
-                                        value={ram.value || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "ramOptions")}
-                                        className="w-full px-4 py-2 bg-gray-700 text-indigo-400 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm font-medium mb-1">Price</label>
-                                      <input
-                                        type="number"
-                                        name={`ramPrice_${index}`}
-                                        placeholder="e.g., 15000"
-                                        value={ram.price || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "ramOptions")}
-                                        className="w-full px-4 py-2 bg-gray-700 text-indigo-400 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                      />
-                                    </div>
-                                    <div>
-                                      <button
-                                        type="button"
-                                        onClick={() => removeField("ramOptions", index)}
-                                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => addField("ramOptions")}
-                                  className="mt-4 px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
-                                >
-                                  Add RAM Option
-                                </button>
-                              </div>
-
-                              {/* platform */}
-                              <div>
-                                <label className="block text-sm mb-1">PlatForm</label>
-                                <input
-                                  type="text"
-                                  name="platform"
-                                  placeholder="e.g., AMD, Intel"
-                                  value={formData.platform || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* mother board */}
-                              <div>
-                                <label className="block text-sm mb-1">Motherboard</label>
-                                <input
-                                  type="text"
-                                  name="motherboard"
-                                  placeholder="e.g., MSI B450 Tomahawk"
-                                  value={formData.motherboard || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* storage1 */}
-                              <div>
-                                <h3 className="text-lg font-semibold mb-2">Storage1 Configurations</h3>
-                                {formData.storage1Options?.map((storage, index) => (
-                                  <div key={index} className="grid grid-cols-2 gap-4 items-center mb-4">
-                                    <div>
-                                      <label className="block text-sm mb-1">Storage1</label>
-                                      <input
-                                        type="text"
-                                        name={`storage1_${index}`}
-                                        placeholder="e.g., 512GB SSD, 1TB HDD"
-                                        value={storage.value || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "storage1Options")}
-                                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm mb-1">Price</label>
-                                      <input
-                                        type="number"
-                                        name={`storage1Price_${index}`}
-                                        placeholder="e.g., 15000"
-                                        value={storage.price || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "storage1Options")}
-                                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                      />
-                                    </div>
-                                    <div>
-                                      <button
-                                        type="button"
-                                        onClick={() => removeField("storage1Options", index)}
-                                        className="px-4 py-2 bg-red-600 text-white rounded-md"
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => addField("storage1Options")}
-                                  className="px-4 py-2 bg-indigo-600 text-white rounded-md"
-                                >
-                                  Add Storage 1 Option
-                                </button>
-                              </div>
-
-                              {/* smps */}
-                              <div>
-                                <label className="block text-sm mb-1">SMPS</label>
-                                <input
-                                  type="text"
-                                  name="smps"
-                                  placeholder="e.g., Deepcool - PK450D Bronze"
-                                  value={formData.smps || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* cabinet */}
-                              <div>
-                                <label className="block text-sm mb-1">Cabinet</label>
-                                <input
-                                  type="text"
-                                  name="cabinet"
-                                  placeholder="e.g., NZXT H510"
-                                  value={formData.cabinet || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-                            </>
-                          )}
-
-                          {/* Additional Fields for Refurbished Laptop */}
-                          {formData.type === "Refurbished Laptop" && (
-                            <>
-
-                              {/* ram */}
-                              <div>
-                                <label className="block text-sm mb-1">RAM</label>
-                                <input
-                                  type="text"
-                                  name="ram"
-                                  placeholder="e.g., 8GB, 16GB"
-                                  value={formData.ram || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* storage */}
-                              <div>
-                                <label className="block text-sm mb-1">Storage</label>
-                                <input
-                                  type="text"
-                                  name="storage"
-                                  placeholder="e.g., 256GB SSD, 1TB HDD"
-                                  value={formData.storage || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* display */}
-                              <div>
-                                <label className="block text-sm mb-1">Display</label>
-                                <input
-                                  type="text"
-                                  name="display"
-                                  placeholder="e.g., 15.6-inch FHD"
-                                  value={formData.display || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* os */}
-                              <div>
-                                <label className="block text-sm mb-1">Operating System</label>
-                                <input
-                                  type="text"
-                                  name="os"
-                                  placeholder="e.g., Windows 10, Linux"
-                                  value={formData.os || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-                            </>
-                          )}
-
-                          {/* Conditional Fields for Pre-Built PC */}
-                          {formData.type === "Pre-Built PC" && (
-                            <>
-
-                              {/* RAM Configurations */}
-                              <div>
-                                <h3 className="text-lg font-semibold mb-4">RAM Configurations</h3>
-                                {(formData.ramOptions || []).map((ram, index) => (
-                                  <div key={index} className="grid grid-cols-2 gap-4 items-center mb-6">
-                                    <div>
-                                      <label className="block text-sm font-medium mb-1">RAM</label>
-                                      <input
-                                        type="text"
-                                        name="value"
-                                        placeholder="e.g., 8GB, 16GB"
-                                        value={ram.value || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "ramOptions")}
-                                        className="w-full px-4 py-2 bg-gray-700 text-indigo-400 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm font-medium mb-1">Price</label>
-                                      <input
-                                        type="number"
-                                        name={`ramPrice_${index}`}
-                                        placeholder="e.g., 15000"
-                                        value={ram.price || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "ramOptions")}
-                                        className="w-full px-4 py-2 bg-gray-700 text-indigo-400 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                      />
-                                    </div>
-                                    <div>
-                                      <button
-                                        type="button"
-                                        onClick={() => removeField("ramOptions", index)}
-                                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => addField("ramOptions")}
-                                  className="mt-4 px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
-                                >
-                                  Add RAM Option
-                                </button>
-                              </div>
-
-                              {/* platform */}
-                              <div>
-                                <label className="block text-sm mb-1">PlatForm</label>
-                                <input
-                                  type="text"
-                                  name="platform"
-                                  placeholder="e.g., AMD, Intel"
-                                  value={formData.platform || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* mother board */}
-                              <div>
-                                <label className="block text-sm mb-1">Motherboard</label>
-                                <input
-                                  type="text"
-                                  name="motherboard"
-                                  placeholder="e.g., MSI B450 Tomahawk"
-                                  value={formData.motherboard || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* storage1 */}
-                              <div>
-                                <h3 className="text-lg font-semibold mb-2">Storage1 Configurations</h3>
-                                {formData.storage1Options?.map((storage, index) => (
-                                  <div key={index} className="grid grid-cols-2 gap-4 items-center mb-4">
-                                    <div>
-                                      <label className="block text-sm mb-1">Storage1</label>
-                                      <input
-                                        type="text"
-                                        name={`storage1_${index}`}
-                                        placeholder="e.g., 512GB SSD, 1TB HDD"
-                                        value={storage.value || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "storage1Options")}
-                                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm mb-1">Price</label>
-                                      <input
-                                        type="number"
-                                        name={`storage1Price_${index}`}
-                                        placeholder="e.g., 15000"
-                                        value={storage.price || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "storage1Options")}
-                                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                      />
-                                    </div>
-                                    <div>
-                                      <button
-                                        type="button"
-                                        onClick={() => removeField("storage1Options", index)}
-                                        className="px-4 py-2 bg-red-600 text-white rounded-md"
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => addField("storage1Options")}
-                                  className="px-4 py-2 bg-indigo-600 text-white rounded-md"
-                                >
-                                  Add Storage 1 Option
-                                </button>
-                              </div>
-
-                              {/* storage2 */}
-                              <div>
-                                <h3 className="text-lg font-semibold mb-2">Storage2 Configurations</h3>
-                                {formData.storage2Options?.map((storage, index) => (
-                                  <div key={index} className="grid grid-cols-2 gap-4 items-center mb-4">
-                                    <div>
-                                      <label className="block text-sm mb-1">Storage2</label>
-                                      <input
-                                        type="text"
-                                        name={`storage2_${index}`}
-                                        placeholder="e.g., 512GB SSD, 1TB HDD"
-                                        value={storage.value || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "storage2Options")}
-                                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm mb-1">Price</label>
-                                      <input
-                                        type="number"
-                                        name={`storage2Price_${index}`}
-                                        placeholder="e.g., 15000"
-                                        value={storage.price || ""}
-                                        onChange={(e) => handleDynamicChange(e, index, "storage2Options")}
-                                        className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                      />
-                                    </div>
-                                    <div>
-                                      <button
-                                        type="button"
-                                        onClick={() => removeField("storage2Options", index)}
-                                        className="px-4 py-2 bg-red-600 text-white rounded-md"
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => addField("storage2Options")}
-                                  className="px-4 py-2 bg-indigo-600 text-white rounded-md"
-                                >
-                                  Add Storage 2 Option
-                                </button>
-                              </div>
-
-                              {/* liquid cooler */}
-                              <div>
-                                <label className="block text-sm mb-1">Liquid Cooler</label>
-                                <input
-                                  type="text"
-                                  name="liquidcooler"
-                                  placeholder="e.g., Cooler Master Hyper 212"
-                                  value={formData.liquidcooler || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* smps */}
-                              <div>
-                                <label className="block text-sm mb-1">SMPS</label>
-                                <input
-                                  type="text"
-                                  name="smps"
-                                  placeholder="e.g., Deepcool - PK450D Bronze"
-                                  value={formData.smps || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-
-                              {/* cabinet */}
-                              <div>
-                                <label className="block text-sm mb-1">Cabinet</label>
-                                <input
-                                  type="text"
-                                  name="cabinet"
-                                  placeholder="e.g., NZXT H510"
-                                  value={formData.cabinet || ""}
-                                  onChange={handleFormChange}
-                                  className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                />
-                              </div>
-                            </>
-                          )}
-
-                          {/* Other Technical Details Input Section */}
-                          <div className="mt-4">
-                            <h3 className="text-lg font-semibold text-indigo-400">Other Technical Details</h3>
-                            {formData.otherTechnicalDetails && formData.otherTechnicalDetails.length > 0
-                              ? formData.otherTechnicalDetails.map((detail, index) => (
-                                <div key={index} className="flex items-center gap-4 mb-2">
-                                  <input
-                                    type="text"
-                                    name="name"
-                                    placeholder="Detail Name (e.g., WIFI)"
-                                    value={detail.name}
-                                    onChange={(e) => handleOtherTechnicalDetailsChange(index, "name", e.target.value)}
-                                    className="w-1/2 px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                  />
-                                  <input
-                                    type="text"
-                                    name="value"
-                                    placeholder="Detail Value (e.g., 802.11ax Wi-Fi 6)"
-                                    value={detail.value}
-                                    onChange={(e) => handleOtherTechnicalDetailsChange(index, "value", e.target.value)}
-                                    className="w-1/2 px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeOtherTechnicalDetail(index)}
-                                    className="text-red-500 hover:text-red-700"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              ))
-                              : null}
                             <button
                               type="button"
-                              onClick={addOtherTechnicalDetail}
-                              className="px-4 py-2 mt-2 text-white bg-indigo-500 rounded-md hover:bg-indigo-600"
+                              onClick={() => removeOtherTechnicalDetail(index)}
+                              className="text-red-500 hover:text-red-700"
                             >
-                              Add Detail
+                              Remove
                             </button>
                           </div>
-
-                          {/* Notes Input Section */}
-                          <div className="mt-6">
-                            <h3 className="text-lg font-semibold text-indigo-400">Notes</h3>
-                            {formData.notes && formData.notes.length > 0 ? (
-                              formData.notes.map((note, index) => (
-                                <div key={index} className="flex items-center gap-4 mb-2">
-                                  <textarea
-                                    name="note"
-                                    placeholder="Note"
-                                    value={note}
-                                    onChange={(e) => handleNotesChange(index, e.target.value)}
-                                    className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeNote(index)}
-                                    className="text-red-500 hover:text-red-700"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              ))
-                            ) : (
-                              <p>No notes available</p> // Optional fallback if there are no notes
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={addNote}
-                              className="px-4 py-2 mt-2 text-white bg-indigo-500 rounded-md hover:bg-indigo-600"
-                            >
-                              Add Note
-                            </button>
-                          </div>
-
-                          {/* Submit Button */}
-                          <button
-                            type="submit"
-                            className="py-2 px-4 bg-indigo-500 text-gray-900 font-semibold rounded-md hover:bg-indigo-600 transition"
-                          >
-                            {formData.id ? "Update Product" : "Create Product"}
-                          </button>
-                        </form>
-                      </div>
+                        ))
+                        : null}
+                      <button
+                        type="button"
+                        onClick={addOtherTechnicalDetail}
+                        className="px-4 py-2 mt-2 text-white bg-indigo-500 rounded-md hover:bg-indigo-600"
+                      >
+                        Add Detail
+                      </button>
                     </div>
-                  )}
+
+                    {/* Notes Input Section */}
+                    <div className="mt-6">
+                      <h3 className="text-lg font-semibold text-indigo-400">Notes</h3>
+                      {formData.notes && formData.notes.length > 0 ? (
+                        formData.notes.map((note, index) => (
+                          <div key={index} className="flex items-center gap-4 mb-2">
+                            <textarea
+                              name="note"
+                              placeholder="Note"
+                              value={note}
+                              onChange={(e) => handleNotesChange(index, e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-700 text-indigo-400 rounded-md"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeNote(index)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <p>No notes available</p> // Optional fallback if there are no notes
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={addNote}
+                        className="px-4 py-2 mt-2 text-white bg-indigo-500 rounded-md hover:bg-indigo-600"
+                      >
+                        Add Note
+                      </button>
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      className="py-2 px-4 bg-indigo-500 text-gray-900 font-semibold rounded-md hover:bg-indigo-600 transition"
+                    >
+                      {formData.id ? "Update Product" : "Create Product"}
+                    </button>
+                  </form>
                 </div>
               </div>
-            </section>
+            )}
 
             {/* Subscribe sction */}
             <section className="mb-6">
@@ -2913,7 +2542,20 @@ const AdminPanel = () => {
 
             {/* Login History Section */}
             <section className="mt-6">
-              <h2 className="text-2xl font-semibold mb-4">Login History</h2>
+              {/* Header with Flexbox */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-semibold">Login History</h2>
+
+                {loginHistory.length > 0 && (
+                  <button
+                    onClick={deleteAllLoginHistory}
+                    className="bg-red-600 text-white py-2 px-4 rounded-lg text-sm mt-4"
+                  >
+                    Delete All
+                  </button>
+                )}
+              </div>
+
               {loginHistory.length > 0 ? (
                 <div className="space-y-4">
                   {loginHistory.map((event, index) => (

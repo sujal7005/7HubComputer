@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Link, useParams } from 'react-router-dom';
 
 const Laptop = () => {
@@ -15,7 +16,7 @@ const Laptop = () => {
       setLoading(true);
       setLaptops([]);
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`);
+        const response = await fetch(`http://localhost:4000/api/admin/products?page=${page}&limit=${limit}`);
         const data = await response.json();
         setLaptops(data.refurbishedProducts || []);
         // console.log(data);
@@ -26,7 +27,7 @@ const Laptop = () => {
       }
     };
 
-    fetchLaptops(1,10);
+    fetchLaptops(1, 10);
   }, [id]);
 
   const categoryArray = category.split(",").map((cat) => cat.trim());
@@ -51,6 +52,12 @@ const Laptop = () => {
 
   return (
     <div className="text-center bg-gradient-to-b from-gray-900 to-gray-700 text-white py-10 px-4">
+      
+      <Helmet>
+        <title>Laptops - Buy Gaming, Business & Student Laptops</title>
+        <meta name="description" content="Explore our collection of gaming, business, and student laptops at the best prices." />
+      </Helmet>
+
       <h1 className="text-4xl font-extrabold mb-8 text-blue-400">Laptops</h1>
 
       {/* Filter and Sort Options */}
@@ -89,7 +96,7 @@ const Laptop = () => {
                   className="w-full h-56 object-cover transition duration-300 hover:scale-105"
                   src={
                     Array.isArray(laptop.image) && laptop.image.length > 0
-                      ? `http://localhost:5000/uploads/${laptop.image[0].split('\\').pop()}` // Extract the file name from the path
+                      ? `http://localhost:4000/uploads/${laptop.image[0].split('\\').pop()}` // Extract the file name from the path
                       : "path/to/default-image.jpg" // Fallback image
                   }
                   alt={laptop.name || "Refurbished Product"}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 const MiniPCs = () => {
   const { id } = useParams();
@@ -14,7 +15,7 @@ const MiniPCs = () => {
     // Fetch data from the backend
     const fetchPCs = async (page = 1, limit = 10) => {
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`);
+        const response = await fetch(`http://localhost:4000/api/admin/products?page=${page}&limit=${limit}`);
         const data = await response.json();
         console.log(data)
         setPcs(data.miniPCs);
@@ -49,6 +50,12 @@ const MiniPCs = () => {
 
   return (
     <div className="text-center bg-gradient-to-b from-gray-900 to-gray-700 text-white py-10 px-4">
+
+      <Helmet>
+        <title>Mini PCs - Compact, Powerful & Energy Efficient</title>
+        <meta name="description" content="Explore high-performance mini PCs for gaming, office work, and everyday use." />
+      </Helmet>
+
       <h1 className="text-4xl font-extrabold mb-8 text-blue-400">Mini PCs</h1>
 
       {/* Filter and Sort Options */}
@@ -83,13 +90,13 @@ const MiniPCs = () => {
           >
             <Link to={`/mini-pcs/${pc._id}`}>
               {/* {Array.isArray(pc.image) && pc.image.length > 0 &&
-                console.log(`http://localhost:5000/uploads/${pc.image[0].split('\\').pop()}`)
+                console.log(`http://localhost:4000/uploads/${pc.image[0].split('\\').pop()}`)
               } */}
               <img
                 className="w-full h-56 object-cover transition duration-300 hover:scale-105"
                 src={
                   Array.isArray(pc.image) && pc.image.length > 0
-                    ? `http://localhost:5000/uploads/${pc.image[0].split('\\').pop()}` // Use the first image if available
+                    ? `http://localhost:4000/uploads/${pc.image[0].split('\\').pop()}` // Use the first image if available
                     : "path/to/default-image.jpg" // Fallback image
                 }
                 alt={pc.name || "Pre-Built PC"}

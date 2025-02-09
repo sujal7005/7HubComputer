@@ -28,7 +28,7 @@ const Profile = () => {
       // Fetch user profile if user data exists in localStorage
       const fetchUserProfile = async () => {
         try {
-          const response = await axios.get(`http://localhost:5000/api/users/${storedUser._id}`);
+          const response = await axios.get(`http://localhost:4000/api/users/${storedUser._id}`);
           setUser(response.data); // Set the updated user data
           setName(response.data.name || '');
           setPhoneNumber(response.data.phoneNumber || '');
@@ -51,7 +51,7 @@ const Profile = () => {
 
   const handleInvoiceGeneration = async (order) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/users/orders/generate-invoice-pdf/${order._id}`);
+      const response = await fetch(`http://localhost:4000/api/users/orders/generate-invoice-pdf/${order._id}`);
       
       if (response.ok) {
         const blob = await response.blob();
@@ -78,7 +78,7 @@ const Profile = () => {
     }
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/users/${userId}/orders`);
+      const response = await axios.get(`http://localhost:4000/api/users/${userId}/orders`);
       setUserOrders(Array.isArray(response.data) ? response.data : []);
       console.log('User Orders:', response.data);
     } catch (error) {
@@ -92,7 +92,7 @@ const Profile = () => {
       return;
     }
     try {
-      const response = await axios.get(`http://localhost:5000/api/users/${userId}/addresses`);
+      const response = await axios.get(`http://localhost:4000/api/users/${userId}/addresses`);
       setUserAddresses(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch user addresses:', error);
@@ -105,7 +105,7 @@ const Profile = () => {
       return;
     }
     try {
-      const response = await axios.get(`http://localhost:5000/api/users/${userId}/transactions`);
+      const response = await axios.get(`http://localhost:4000/api/users/${userId}/transactions`);
       setTransactionHistory(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch transaction history:', error);
@@ -117,7 +117,7 @@ const Profile = () => {
 
     try {
       const response = await axios.put(
-        'http://localhost:5000/api/users/update-user',
+        'http://localhost:4000/api/users/update-user',
         updatedUser,
       );
 
@@ -140,7 +140,7 @@ const Profile = () => {
 
     const userId = user._id;
     try {
-      const response = await axios.post(`http://localhost:5000/api/users/${userId}/add-address`, newAddress);
+      const response = await axios.post(`http://localhost:4000/api/users/${userId}/add-address`, newAddress);
       if (response.data.success) {
         setUserAddresses([...userAddresses, response.data.address]);
         setNewAddress({ line1: '', line2: '', city: '', state: '', zip: '' });
@@ -161,7 +161,7 @@ const Profile = () => {
 
     try {
       const response = await axios.put(
-        `http://localhost:5000/api/users/${userId}/update-address/${addressToSave._id}`,
+        `http://localhost:4000/api/users/${userId}/update-address/${addressToSave._id}`,
         addressToSave
       );
       if (response.data.success) {
@@ -185,7 +185,7 @@ const Profile = () => {
     const addressToRemove = userAddresses[index];
     try {
       const response = await axios.delete(
-        `http://localhost:5000/api/users/${userId}/remove-address/${addressToRemove._id}`
+        `http://localhost:4000/api/users/${userId}/remove-address/${addressToRemove._id}`
       );
       if (response.data.success) {
         const updatedAddresses = userAddresses.filter((_, i) => i !== index);
@@ -199,7 +199,7 @@ const Profile = () => {
 
   const handleCancelOrder = async (orderId) => {
     try {
-      const response = await axios.put(`http://localhost:5000/api/users/orders/${orderId}/cancel`);
+      const response = await axios.put(`http://localhost:4000/api/users/orders/${orderId}/cancel`);
       if (response.data.success) {
         setUserOrders((prevOrders) =>
           prevOrders.map((order) =>
@@ -218,7 +218,7 @@ const Profile = () => {
 
   const handleViewOrderDetails = async (orderId) => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/users/orders/${orderId}`);
+      const response = await axios.get(`http://localhost:4000/api/users/orders/${orderId}`);
       if (response.data.success) {
         setSelectedOrder(response.data.order);
         setIsModalOpen(true);
@@ -351,7 +351,7 @@ const Profile = () => {
                         className="py-2 px-4 bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-300 ease-in-out">
                         Generate Invoice
                       </button>
-                      {order.status !== 'Cancelled' && (
+                      {order.status !== 'Cancelled'&& order.status !== "Delivered" && (
                         <button
                           className="bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 transition duration-300 ease-in-out"
                           onClick={() => handleCancelOrder(order._id)}
@@ -385,7 +385,7 @@ const Profile = () => {
               <div className="mb-4">
                 <img
                   src={selectedOrder.product?.image
-                    ? `http://localhost:5000/uploads/${selectedOrder.product.image[0].split('\\').pop()}`
+                    ? `http://localhost:4000/uploads/${selectedOrder.product.image[0].split('\\').pop()}`
                     : '/path/to/placeholder-image.jpg'} // Optional placeholder image for missing images
                   alt={selectedOrder.product?.name}
                   className="w-90 h-[300px] object-cover mb-4 rounded-lg"

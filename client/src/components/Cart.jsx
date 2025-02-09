@@ -57,7 +57,7 @@ const Cart = () => {
                 {/* Item Details and Image */}
                 <div className="flex flex-col md:flex-row items-center md:w-3/4">
                   <img
-                    src={`http://localhost:5000/uploads/${item.image[0].split('\\').pop()}`}
+                    src={`http://localhost:4000/uploads/${item.image[0].split('\\').pop()}`}
                     alt={item.name}
                     loading='lazy'
                     className="h-24 w-24 object-cover rounded-md mr-6 mb-4 md:mb-0"

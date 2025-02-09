@@ -94,7 +94,7 @@ const CustomPC = () => {
     // const configuration = selectedParts;
 
     // try {
-    //   const response = await fetch('http://localhost:5000/api/createOrder', {
+    //   const response = await fetch('http://localhost:4000/api/createOrder', {
     //     method: 'POST',
     //     headers: {
     //       'Content-Type': 'application/json',

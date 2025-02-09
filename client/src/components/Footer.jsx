@@ -36,7 +36,7 @@ const Footer = () => {
               const email = emailInput.value;
 
               try {
-                const response = await fetch("http://localhost:5000/api/subscribe", {
+                const response = await fetch("http://localhost:4000/api/subscribe", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ email }),

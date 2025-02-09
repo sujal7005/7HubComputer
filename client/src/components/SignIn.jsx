@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import FacebookLogin from 'react-facebook-login';
 import { FaTwitter } from 'react-icons/fa';
 import axios from 'axios';
 
@@ -42,7 +41,7 @@ const SignIn = () => {
     try {
         console.log("Requesting OTP for email:", resetEmail);
         const data = resetEmail ? { email: resetEmail } : { phone: resetPhone };
-        const response = await axios.post('http://localhost:5000/api/forgot-password/request-otp', data);
+        const response = await axios.post('http://localhost:4000/api/forgot-password/request-otp', data);
         console.log("OTP Response:", response.data);  
         if (response.data.success) {
             setStep(2);
@@ -60,7 +59,7 @@ const SignIn = () => {
     e.preventDefault();
     try {
       const data = resetEmail ? { email: resetEmail, otp } : { phone: resetPhone, otp };
-      const response = await axios.post('http://localhost:5000/api/forgot-password/verify-otp', data);
+      const response = await axios.post('http://localhost:4000/api/forgot-password/verify-otp', data);
       if (response.data.success) {
         setStep(3);
         setResetMessage('OTP verified. You can now reset your password.');
@@ -80,7 +79,7 @@ const SignIn = () => {
             ? { email: resetEmail, newPassword }
             : { phone: resetPhone, newPassword };
 
-        const response = await axios.post('http://localhost:5000/api/forgot-password/reset-password', data);
+        const response = await axios.post('http://localhost:4000/api/forgot-password/reset-password', data);
 
         if (response.data.success) {
             setResetMessage('Password has been reset. Please login.');
@@ -113,7 +112,7 @@ const SignIn = () => {
       if (isSignUp) {
         // Update the API URL to the correct port
         console.log({ name, email, password, phoneNumber });
-        const response = await axios.post('http://localhost:5000/api/signup', { name, email, password, phoneNumber });
+        const response = await axios.post('http://localhost:4000/api/signup', { name, email, password, phoneNumber });
         if (response.data.success) {
           localStorage.setItem('user', JSON.stringify(response.data.user));
           setUserId(response.data.user._id);
@@ -122,7 +121,7 @@ const SignIn = () => {
           setError(response.data.message || 'Sign up failed');
         }
       } else {
-        const response = await axios.post('http://localhost:5000/api/signin', { email, password });
+        const response = await axios.post('http://localhost:4000/api/signin', { email, password });
         if (response.data.success) {
           localStorage.setItem('user', JSON.stringify(response.data.user));
           setUserId(response.data.user._id);
@@ -142,7 +141,7 @@ const SignIn = () => {
     const { credential } = response;
     console.log("Google response:", response);
     try {
-      const res = await axios.post('http://localhost:5000/api/google-signin', { credential });
+      const res = await axios.post('http://localhost:4000/api/google-signin', { credential });
       console.log("Backend response:", res.data); 
       if (res.data.success) {
         localStorage.setItem('user', JSON.stringify(res.data.user));
@@ -161,7 +160,7 @@ const SignIn = () => {
   const handleFacebookLoginSuccess = async (response) => {
     const { accessToken } = response;
     try {
-      const res = await axios.post('http://localhost:5000/api/facebook-signin', { accessToken });
+      const res = await axios.post('http://localhost:4000/api/facebook-signin', { accessToken });
       if (res.data.success) {
         localStorage.setItem('user', JSON.stringify(res.data.user));
         setUserId(res.data.user._id);
@@ -178,7 +177,7 @@ const SignIn = () => {
   const handleTwitterLoginSuccess = async (response) => {
     const { oauth_token, oauth_token_secret } = response;
     try {
-      const response = await axios.post('http://localhost:5000/api/twitter-signin', { oauth_token, oauth_token_secret });
+      const response = await axios.post('http://localhost:4000/api/twitter-signin', { oauth_token, oauth_token_secret });
       if (response.data.url) {
         window.location.href = response.data.url;
         navigate('/profile');
@@ -273,14 +272,14 @@ const SignIn = () => {
               />
 
               {/* Facebook Login */}
-              <FacebookLogin
+              {/* <FacebookLogin
                 appId="YOUR_FACEBOOK_APP_ID"
                 autoLoad={false}
                 fields="name,email,picture"
                 callback={handleFacebookLoginSuccess}
                 cssClass="my-2 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
                 icon="fa-facebook"
-              />
+              /> */}
 
               {/* Twitter Login */}
               <button

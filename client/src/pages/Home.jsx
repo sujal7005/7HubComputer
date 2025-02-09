@@ -83,7 +83,7 @@ const Home = () => {
   useEffect(() => {
     const fetchProducts = async (page = 1, limit = 10) => {
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/products?page=${page}&limit=${limit}`, {
+        const response = await fetch(`http://localhost:4000/api/admin/products?page=${page}&limit=${limit}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
 
@@ -170,7 +170,7 @@ const Home = () => {
                 className="bg-white rounded-xl shadow-lg transform hover:-translate-y-2 hover:shadow-2xl transition duration-300"
               >
                 <img
-                  src={`http://localhost:5000/uploads/${product.image[0].split('\\').pop()}`}
+                  src={`http://localhost:4000/uploads/${product.image[0].split('\\').pop()}`}
                   alt={product.name}
                   className="w-full h-56 object-cover transform transition-transform duration-300 hover:scale-105"
                   loading="lazy"
@@ -230,7 +230,7 @@ const Home = () => {
                 className="bg-gray-100 rounded-lg shadow-md overflow-hidden transform hover:scale-105 transition duration-300"
               >
                 <img
-                  src={`http://localhost:5000/uploads/${laptop.image[0].split('\\').pop()}`}
+                  src={`http://localhost:4000/uploads/${laptop.image[0].split('\\').pop()}`}
                   alt={laptop.name}
                   className="w-full h-56 object-cover transform transition-transform duration-300 hover:scale-90"
                   loading="lazy"

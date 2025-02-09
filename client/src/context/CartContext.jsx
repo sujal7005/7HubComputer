@@ -25,7 +25,7 @@ export const CartProvider = ({ children }) => {
         setCartItems(guestCart ? JSON.parse(guestCart) : []);
       } else {
         try {
-          const response = await axios.get(`http://localhost:5000/api/cart/${userId}`);
+          const response = await axios.get(`http://localhost:4000/api/cart/${userId}`);
           setCartItems(response.data.products || []);
         } catch (error) {
           console.error('Failed to fetch cart data:', error);
@@ -74,7 +74,7 @@ export const CartProvider = ({ children }) => {
       console.log('Updated guest cart:', cartItems);
     } else {
       try {
-        const response = await axios.post(`http://localhost:5000/api/cart/${userId}/add`, newCartItem);
+        const response = await axios.post(`http://localhost:4000/api/cart/${userId}/add`, newCartItem);
         console.log('Response from addToCart API:', response.data);
         setCartItems(response.data.cartItems || []);
       } catch (error) {
@@ -91,7 +91,7 @@ export const CartProvider = ({ children }) => {
       Cookies.set('guestCart', JSON.stringify(updatedCart), { expires: 7 });
     } else {
       try {
-        await axios.delete(`http://localhost:5000/api/cart/${userId}/remove/${id}`);
+        await axios.delete(`http://localhost:4000/api/cart/${userId}/remove/${id}`);
       } catch (error) {
         console.error('Failed to remove from cart:', error);
       }
@@ -105,7 +105,7 @@ export const CartProvider = ({ children }) => {
       Cookies.remove('guestCart');
     } else {
       try {
-        await axios.delete(`http://localhost:5000/api/cart/${userId}/clear`);
+        await axios.delete(`http://localhost:4000/api/cart/${userId}/clear`);
       } catch (error) {
         console.error('Failed to clear cart:', error);
       }
@@ -121,7 +121,7 @@ export const CartProvider = ({ children }) => {
       Cookies.set('guestCart', JSON.stringify(updatedCart), { expires: 7 });
     } else {
       try {
-        const response = await axios.patch(`http://localhost:5000/api/cart/${userId}/updateQuantity`, { id, quantity });
+        const response = await axios.patch(`http://localhost:4000/api/cart/${userId}/updateQuantity`, { id, quantity });
         setCartItems(response.data.cartItems || []);
       } catch (error) {
         console.error('Failed to update quantity:', error);
