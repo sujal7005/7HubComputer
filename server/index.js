@@ -31,7 +31,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     // origin: "*",
-    origin: "http://localhost:5173", // Your frontend's origin
+    origin: "process.env.REACT_APP", // Your frontend's origin
     methods: ["GET", "POST", 'PUT', 'DELETE'],
     credentials: true,
   },
@@ -39,7 +39,7 @@ const io = new Server(server, {
 
 app.use(cors({
   // origin: "*",
-  origin: 'http://localhost:5173',
+  origin: 'process.env.REACT_APP',
   methods: ["GET", "POST", 'PUT', 'DELETE'],
   credentials: true,
 }));
