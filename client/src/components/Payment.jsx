@@ -2,12 +2,14 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
 import axios from 'axios';
+import { FaCreditCard, FaGooglePay, FaPhone, FaMoneyBill, FaArrowLeft, FaArrowRight, FaCheck, FaTag } from 'react-icons/fa';
+import { SiPaytm, SiPaypal, SiRazorpay } from 'react-icons/si';
 
 const Payment = () => {
   const location = useLocation();
   const product = location.state?.product; // Retrieve product data from Cart
   const { cart } = useContext(CartContext);
-  const [quantity, setQuantity] = useState(product.quantity || 1);
+  const [quantity, setQuantity] = useState(product?.quantity || 1);
   const [step, setStep] = useState(1);
   const [userDetails, setUserDetails] = useState({
     name: '',
@@ -36,7 +38,49 @@ const Payment = () => {
   const [selectedStorage2, setSelectedStorage2] = useState(null);
   const [discountedPrice, setDiscountedPrice] = useState(product?.finalPrice);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [paypalLoaded, setPaypalLoaded] = useState(false);
+  const [userWithUserId, setUserWithUserId] = useState(null);
   const navigate = useNavigate();
+
+  // Add Razorpay state
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [razorpayOrder, setRazorpayOrder] = useState(null);
+
+  const BASE_URL = `http://${window.location.hostname}:4000`;
+
+  useEffect(() => {
+    const loggedInUserId = localStorage.getItem('user');
+    const parsedUser = loggedInUserId ? JSON.parse(loggedInUserId) : null;
+    
+    const newUserWithId = {
+      ...userDetails,
+      userId: parsedUser ? parsedUser._id : null
+    };
+    
+    console.log('Setting userWithUserId:', newUserWithId);
+    setUserWithUserId(newUserWithId);
+  }, [userDetails]);
+
+  useEffect(() => {
+    console.log('paypalLoaded state changed:', paypalLoaded);
+  }, [paypalLoaded]);
+
+  useEffect(() => {
+    console.log('paymentMethod changed:', paymentMethod);
+    console.log('step changed:', step);
+  }, [paymentMethod, step]);
+
+  // Auto-initialize PayPal when script loads and user is on step 3 with PayPal selected
+  useEffect(() => {
+    if (paypalLoaded && paymentMethod === 'paypal' && step === 3 && userWithUserId?.userId) {
+      console.log('Auto-initializing PayPal with user:', userWithUserId);
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        initializePayPalButtons(userWithUserId);
+      }, 100);
+    }
+  }, [paypalLoaded, paymentMethod, step, userWithUserId]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -49,10 +93,10 @@ const Payment = () => {
 
         if (!userId) return;
 
-        const userResponse = await axios.get(`http://localhost:4000/api/users/${userId}`);
+        const userResponse = await axios.get(`${BASE_URL}/api/users/${userId}`);
         const userData = userResponse.data;
 
-        const addressResponse = await axios.get(`http://localhost:4000/api/users/${userId}/addresses`);
+        const addressResponse = await axios.get(`${BASE_URL}/api/users/${userId}/addresses`);
         const addresses = addressResponse.data;
         // console.log('User addresses:', addresses);
 
@@ -91,6 +135,18 @@ const Payment = () => {
     }
   }, [cart, product]);
 
+  // Load PayPal script when PayPal is selected
+  useEffect(() => {
+    if (paymentMethod === 'paypal' && step === 3) {
+      console.log('Attempting to load PayPal script...');
+      if (!paypalLoaded) {
+        loadPayPalScript();
+      } else {
+        console.log('PayPal already loaded');
+      }
+    }
+  }, [paymentMethod, step, paypalLoaded]);
+
   const calculateTotalPrice = () => {
     let basePrice = product?.finalPrice || 0;
 
@@ -103,17 +159,17 @@ const Payment = () => {
     let storage1Price = selectedStorage1 ? selectedStorage1.price : product?.specs?.storage1Options?.[0]?.price || 0;
     let storage2Price = selectedStorage2 ? selectedStorage2.price : product?.specs?.storage2Options?.[0]?.price || 0;
   
-    return basePrice + ramPrice + storage1Price + storage2Price;
+    return (basePrice + ramPrice + storage1Price + storage2Price) * quantity;
   };
   
   useEffect(() => {
     setDiscountedPrice(calculateTotalPrice());
-  }, [selectedRam, selectedStorage1, selectedStorage2, product, discountApplied, discountAmount]);
+  }, [selectedRam, selectedStorage1, selectedStorage2, product, discountApplied, discountAmount, quantity]);
 
   const handleNextStep = () => {
     if (step === 1) {
       // Validate user details before proceeding
-      if (!userDetails.name || !userDetails.email || !userDetails.phoneNumber || !userDetails.address) {
+      if (!userDetails.name || !userDetails.email || !userDetails.phoneNumber || !userDetails.address?.line1) {
         alert('Please fill in all user details.');
         return;
       }
@@ -133,12 +189,148 @@ const Payment = () => {
 
   const handlePreviousStep = () => setStep((prevStep) => Math.max(prevStep - 1, 1));
 
-  const handleConfirmPayment = async () => {
-    if (!userDetails.name || !userDetails.email || !userDetails.phoneNumber || !userDetails.address) {
-      alert('All user details are required.');
+    // Load Razorpay script
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        setRazorpayLoaded(true);
+        resolve(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => {
+        setRazorpayLoaded(true);
+        resolve(true);
+      };
+      script.onerror = () => {
+        console.error('Failed to load Razorpay SDK');
+        setPaymentStatus({ error: 'Failed to load payment gateway. Please try again.', success: '' });
+        resolve(false);
+      };
+      document.body.appendChild(script);
+    });
+  };
+
+  // Handle Razorpay Payment
+  const handleRazorpayPayment = async () => {
+    if (!userWithUserId?.userId) {
+      setPaymentStatus({ error: 'User information is missing', success: '' });
       return;
     }
 
+    setLoading(true);
+    setPaymentStatus({ error: '', success: 'Creating order...' });
+
+    try {
+      // Load Razorpay script if not loaded
+      if (!razorpayLoaded) {
+        await loadRazorpayScript();
+      }
+
+      // Create order on backend
+      const response = await fetch(`${BASE_URL}/api/create-razorpay-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          orderDetails: {
+            product,
+            userDetails: userWithUserId,
+            quantity,
+            totalPrice: calculateTotalPrice()
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create order');
+      }
+
+      setRazorpayOrder(data);
+
+      // Razorpay options
+      const options = {
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
+        name: '7HubComputer',
+        description: product.name,
+        image: 'https://your-logo-url.com/logo.png', // Add your logo URL
+        order_id: data.razorpayOrderId,
+        handler: async (response) => {
+          // Verify payment
+          const verifyResponse = await fetch(`${BASE_URL}/api/verify-razorpay-payment`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              orderDetails: {
+                product,
+                userDetails: userWithUserId,
+                quantity,
+                totalPrice: calculateTotalPrice()
+              }
+            })
+          });
+
+          const verifyData = await verifyResponse.json();
+
+          if (verifyData.success) {
+            setPaymentStatus({ success: 'Payment successful! Redirecting...', error: '' });
+            setTimeout(() => navigate('/profile'), 2000);
+          } else {
+            setPaymentStatus({ error: 'Payment verification failed', success: '' });
+          }
+        },
+        prefill: {
+          name: userDetails.name,
+          email: userDetails.email,
+          contact: userDetails.phoneNumber
+        },
+        notes: {
+          address: `${userDetails.address?.line1}, ${userDetails.address?.city}`
+        },
+        theme: {
+          color: '#000000'
+        },
+        modal: {
+          ondismiss: () => {
+            setLoading(false);
+            setPaymentStatus({ error: 'Payment cancelled', success: '' });
+          }
+        }
+      };
+
+      // Open Razorpay checkout
+      const razorpayInstance = new window.Razorpay(options);
+      razorpayInstance.open();
+
+    } catch (error) {
+      console.error('Razorpay payment error:', error);
+      setPaymentStatus({ error: error.message, success: '' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!userDetails.name || !userDetails.email || !userDetails.phoneNumber || !userDetails.address?.line1) {
+      alert('All user details are required.');
+      return;
+    }
+  
     if (!paymentMethod) {
       alert('Please select a payment method.');
       return;
@@ -147,23 +339,28 @@ const Payment = () => {
       alert('Please fill in all card details.');
       return;
     }
-
+  
     const loggedInUserId = localStorage.getItem('user');
-    // console.log('Logged in user from localStorage:', loggedInUserId);
-
     const parsedUser = loggedInUserId ? JSON.parse(loggedInUserId) : null;
-    // console.log('Parsed user:', parsedUser);
-
+  
     const userWithUserId = {
       ...userDetails,
       userId: parsedUser ? parsedUser._id : null
     };
-
+  
     if (!userWithUserId.userId) {
       alert('User is not logged in or userId is missing.');
       return;
     }
 
+    // Handle Razorpay methods
+    const razorpayMethods = ['creditCard', 'gpay', 'phonepay', 'netbanking'];
+    
+    if (razorpayMethods.includes(paymentMethod)) {
+      handleRazorpayPayment();
+      return;
+    }
+  
     const apiUrlMap = {
       paypal: '/api/create-paypal-order',
       creditCard: '/api/credit-card',
@@ -173,16 +370,23 @@ const Payment = () => {
       netbanking: '/api/net-banking',
       cashOnDelivery: '/api/cash-on-delivery',
     };
-    // Simulate payment confirmation
 
+    // For PayPal, we don't want to process here - it will be handled separately
+    if (paymentMethod === 'paypal') {
+      handlePayPalPayment(userWithUserId);
+      return;
+    }
+  
     try {
       const apiUrl = apiUrlMap[paymentMethod];
       if (!apiUrl) {
         setPaymentStatus({ error: 'Invalid payment method', success: '' });
         return;
       }
-
-      const response = await fetch(`http://localhost:4000${apiUrl}`, {
+    
+      setPaymentStatus({ error: '', success: 'Processing payment...' });
+    
+      const response = await fetch(`${BASE_URL}${apiUrl}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -194,29 +398,224 @@ const Payment = () => {
           },
         }),
       });
-      console.log('Sending data:', { product, userDetails: userWithUserId, totalPrice: calculateTotalPrice(), });
-
+    
+      const data = await response.json();
+      console.log('Payment response:', data);
+    
       if (response.ok) {
-        setPaymentStatus({ success: 'Payment successful!', error: '' });
-        navigate('/profile');
+        // Handle Paytm redirect specially
+        if (paymentMethod === 'paytm' && data.paytmParams) {
+          // Create a form to submit to Paytm
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = data.paytmUrl;
+          form.target = '_blank'; // Open in new tab
+          
+          // Add Paytm parameters as hidden inputs
+          Object.keys(data.paytmParams).forEach(key => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = data.paytmParams[key];
+            form.appendChild(input);
+          });
+          
+          document.body.appendChild(form);
+          form.submit();
+          document.body.removeChild(form);
+          
+          setPaymentStatus({ 
+            success: 'Redirecting to Paytm...', 
+            error: '' 
+          });
+        } else {
+          // For other payment methods
+          setPaymentStatus({ success: 'Payment successful!', error: '' });
+          setTimeout(() => navigate('/profile'), 2000);
+        }
       } else {
-        const error = await response.json();
-        setPaymentStatus({ error: error.message || 'Payment failed.', success: '' });
+        setPaymentStatus({ error: data.error || 'Payment failed.', success: '' });
       }
     } catch (err) {
+      console.error('Payment error:', err);
       setPaymentStatus({ error: err.message, success: '' });
+    }
+  };
+
+  const loadPayPalScript = () => {
+    return new Promise((resolve) => {
+      if (window.paypal) {
+        setPaypalLoaded(true);
+        resolve(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://www.paypal.com/sdk/js?client-id=${import.meta.env.VITE_PAYPAL_CLIENT_ID}&currency=USD&enable-funding=venmo,paylater`;
+      script.async = true;
+      script.onload = () => {
+        setPaypalLoaded(true);
+        resolve(true);
+      };
+      script.onerror = () => {
+        console.error('Failed to load PayPal SDK');
+        setPaymentStatus({ error: 'Failed to load PayPal. Please try again.', success: '' });
+        resolve(false);
+      };
+      document.body.appendChild(script);
+    });
+  };
+
+  const initializePayPalButtons = (userData) => {
+    console.log('Initializing PayPal buttons with user:', userData);
+    
+    // Clear any existing buttons
+    const container = document.getElementById('paypal-button-container');
+    if (container) {
+      container.innerHTML = '';
+    }
+
+    if (!window.paypal) {
+      console.error('PayPal SDK not loaded');
+      return;
+    }
+
+    window.paypal.Buttons({
+      // Set up the transaction
+      createOrder: (data, actions) => {
+        const inrAmount = (calculateTotalPrice() / 83).toFixed(2);
+
+        return actions.order.create({
+          purchase_units: [{
+            amount: {
+              value: inrAmount,
+              currency_code: 'USD'
+            },
+            description: product?.name || 'Product',
+            custom_id: userData.userId,
+            soft_descriptor: '7HUBCOMPUTER'
+          }],
+          application_context: {
+          brand_name: '7HubComputer',
+          landing_page: 'BILLING',
+          shipping_preference: 'NO_SHIPPING', // Since you already collect address
+          user_action: 'PAY_NOW',
+          return_url: `${window.location.origin}/payment/success`,
+          cancel_url: `${window.location.origin}/payment/cancel`
+        }
+        });
+      },
+
+      onApprove: async (data, actions) => {
+        try {
+          setLoading(true);
+          setPaymentStatus({ error: '', success: 'Processing payment...' });
+
+          const captureResponse = await fetch(`${BASE_URL}/api/capture-paypal-order/${data.orderID}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+
+          const captureData = await captureResponse.json();
+
+          if (captureData.success) {
+            setPaymentStatus({ success: 'Payment successful! Redirecting...', error: '' });
+            setTimeout(() => navigate('/profile'), 2000);
+          } else {
+            throw new Error(captureData.error || 'Payment capture failed');
+          }
+        } catch (error) {
+          console.error('Capture error:', error);
+          setPaymentStatus({ error: error.message, success: '' });
+        } finally {
+          setLoading(false);
+        }
+      },
+
+      onError: (err) => {
+        console.error('PayPal error:', err);
+        setPaymentStatus({ error: 'Payment failed. Please try again.', success: '' });
+      },
+
+      onCancel: () => {
+        setPaymentStatus({ error: 'Payment cancelled', success: '' });
+      }
+    }).render('#paypal-button-container');
+  };
+
+  const handlePayPalPayment = async (userWithUserId) => {
+    console.log('handlePayPalPayment called with:', userWithUserId);
+
+    if (!userWithUserId || !userWithUserId.userId) {
+      setPaymentStatus({ error: 'User information is missing. Please refresh and try again.', success: '' });
+      return;
+    }
+
+    setLoading(true);
+    setPaymentStatus({ error: '', success: 'Initializing PayPal...' });
+
+    try {
+      // Create order on backend
+      const response = await fetch(`${BASE_URL}/api/create-paypal-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ 
+          orderDetails: {
+            product,
+            userDetails: userWithUserId,
+            quantity,
+            totalPrice: calculateTotalPrice(),
+            currency: 'USD'
+          }
+        })
+      });
+
+      const data = await response.json();
+      console.log('PayPal order response:', data);
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create PayPal order');
+      }
+
+      // If PayPal SDK is already loaded, initialize buttons
+      if (window.paypal) {
+        initializePayPalButtons(userWithUserId);
+      } else {
+        // If not loaded, load it first
+        await loadPayPalScript();
+        initializePayPalButtons(userWithUserId);
+      }
+
+    } catch (error) {
+      console.error('PayPal payment error:', error);
+      setPaymentStatus({ error: error.message, success: '' });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setUserDetails((prev) => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        [name]: value,  // Update the specific field in the address object
-      },
-    }));
+    
+    if (name === 'name' || name === 'email' || name === 'phoneNumber') {
+      setUserDetails((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    } else {
+      setUserDetails((prev) => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          [name]: value,
+        },
+      }));
+    }
   };
 
   const handleCardChange = (e) => {
@@ -240,7 +639,7 @@ const Payment = () => {
     const userId = parsedUser ? parsedUser._id : null;
 
     try {
-      const response = await fetch("http://localhost:4000/api/apply-discount", {
+      const response = await fetch(`${BASE_URL}/api/apply-discount`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: discountCode, totalAmount: calculateTotalPrice(), userId }),
@@ -263,247 +662,480 @@ const Payment = () => {
     }
   };
 
+  // Payment method icons mapping
+  const paymentIcons = {
+    creditCard: <FaCreditCard className="text-xl" />,
+    gpay: <FaGooglePay className="text-xl" />,
+    phonepay: <FaPhone className="text-xl" />,
+    paytm: <SiPaytm className="text-xl" />,
+    paypal: <SiPaypal className="text-xl" />,
+    netbanking: <FaMoneyBill className="text-xl" />,
+    cashOnDelivery: <FaMoneyBill className="text-xl" />,
+    razorpay: <SiRazorpay className="text-xl" />
+  };
+
   return (
-    <div className="max-w-md mx-auto mt-10 p-6 bg-gray-800 text-white rounded-lg shadow-lg transition-all duration-500 ease-in-out transform hover:scale-105">
-      <h2 className="text-2xl font-bold mb-4 text-center animate-fade-in">Payment Process</h2>
-
-      {paymentStatus.success && (
-        <div className="p-4 bg-green-500 text-white rounded animate-bounce">
-          {paymentStatus.success}
+    <div className="bg-white pt-24 md:pt-28 pb-20 min-h-screen">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-4xl">
+        
+        {/* Page Header */}
+        <div className="border-b-2 border-black pb-6 mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-black">Checkout</h1>
+          <p className="text-gray-600 mt-2">Complete your purchase in 3 simple steps</p>
         </div>
-      )}
-      {paymentStatus.error && (
-        <div className="p-4 bg-red-500 text-white rounded animate-shake">
-          {paymentStatus.error}
-        </div>
-      )}
 
-      {/* Display selected product details */}
-      {product && (
-        <div className="flex flex-col md:flex-row items-center gap-6 animate-slide-up">
-
-          {/* Left Side - Product Image */}
-          <div className="w-full md:w-1/2 flex justify-center">
-            <img
-              src={`http://localhost:4000/uploads/${product.image[0].split('\\').pop()}`}
-              alt={product.name}
-              className="w-40 h-40 object-cover rounded-lg shadow-md border border-gray-500 transition-transform duration-300 hover:scale-110"
-            />
-          </div>
-
-          {/* Right Side - Product Details */}
-          <div className="w-full md:w-1/2">
-            <h3 className="text-xl font-bold">
-              {product?.name || 'No Name Available'}
-            </h3>
-            <p>{product.description}</p>
-            <p className="font-semibold text-lg">
-              Price: ₹{discountApplied ? discountedPrice.toFixed(2) : (calculateTotalPrice() * quantity).toFixed(2)}
-            </p>
-            {discountApplied && (
-              <p className="text-green-400">Discount Applied: ₹{discountAmount} off 🎉</p>
-            )}
-            {/* {console.log(product)} */}
-            {/* Quantity Selection */}
-            <div className="flex items-center mt-3">
-              <label className="font-semibold mr-2">Quantity:</label>
-              <input
-                type="number"
-                value={quantity}
-                onChange={handleQuantityChange}
-                className="w-16 text-center border border-gray-500 rounded bg-gray-700 text-white focus:ring-2 focus:ring-blue-500"
-                min="1"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 1: User Details */}
-      {step === 1 && (
-        <div className="animate-fade-in">
-          <h3 className="text-xl font-semibold mb-4">Enter Your Details</h3>
-          {['name', 'email', 'phoneNumber'].map((field) => (
-            <input
-              key={field}
-              type={field === 'email' ? 'email' : 'text'}
-              name={field}
-              value={userDetails[field]}
-              onChange={handleChange}
-              placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
-              className="p-2 border border-gray-500 rounded w-full mb-2 text-black focus:ring-2 focus:ring-blue-500"
-            />
-          ))}
-
-          {/* Separate inputs for each address field */}
-          {['line1', 'line2', 'city', 'state', 'zip'].map((field) => (
-            <div key={field} className="mb-4 animate-slide-up">
-              <label htmlFor={field} className="block text-sm font-medium text-white">
-                {field.charAt(0).toUpperCase() + field.slice(1)}
-              </label>
-              <input
-                id={field}
-                type="text"
-                name={field}
-                value={userDetails.address?.[field] || ''}
-                onChange={(e) => handleChange({ target: { name: field, value: e.target.value } })}
-                placeholder={`Enter your ${field}`}
-                className="p-2 border border-gray-500 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
-              />
+        {/* Progress Steps */}
+        <div className="flex items-center justify-between mb-8">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center flex-1">
+              <div className={`flex items-center justify-center w-10 h-10 border-2 border-black font-bold text-lg
+                ${step >= i ? 'bg-black text-white' : 'bg-white text-black'}`}>
+                {i}
+              </div>
+              <div className={`flex-1 h-0.5 mx-2 ${step > i ? 'bg-black' : 'bg-gray-300'}`}></div>
             </div>
           ))}
-
-          <button
-            onClick={handleNextStep}
-            className="bg-blue-500 text-white p-2 rounded w-full mt-4 transition-all duration-300 hover:bg-blue-600 hover:scale-105">
-            Next
-          </button>
         </div>
-      )}
 
-      {/* Step 2: Payment Method Selection */}
-      {step === 2 && (
-        <div className="bg-white shadow-lg rounded-xl p-6 md:p-8 w-full max-w-lg mx-auto border border-gray-300 animate-fade-in">
-          <h3 className="text-2xl font-bold text-gray-800 mb-5 text-center animate-slide-down">
-            Select Payment Method
-          </h3>
+        {/* Payment Status Messages */}
+        {paymentStatus.success && (
+          <div className="mb-6 border-2 border-green-500 bg-green-50 p-4">
+            <p className="text-green-700 font-medium">{paymentStatus.success}</p>
+          </div>
+        )}
+        {paymentStatus.error && (
+          <div className="mb-6 border-2 border-red-500 bg-red-50 p-4">
+            <p className="text-red-700 font-medium">{paymentStatus.error}</p>
+          </div>
+        )}
 
-          {/* Payment Method Dropdown */}
-          <select
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-            className="p-3 border border-gray-400 rounded-lg w-full mb-5 text-gray-700 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-transform transform hover:scale-105 duration-200 ease-in-out"
-          >
-            <option value="">Choose a payment method</option>
-            <option value="creditCard">Credit Card</option>
-            <option value="gpay">Google Pay</option>
-            <option value="phonepay">Phone Pay</option>
-            <option value="paytm">Paytm</option>
-            <option value="paypal">PayPal</option>
-            <option value="netbanking">Net Banking</option>
-            <option value="cashOnDelivery">Cash on Delivery</option>
-          </select>
-
-          {/* Credit Card Fields */}
-          {paymentMethod === "creditCard" && (
-            <div className="space-y-3">
-              <input
-                type="text"
-                name="cardNumber"
-                value={cardDetails.cardNumber}
-                onChange={handleCardChange}
-                placeholder="Card Number"
-                className="p-3 border border-gray-400 rounded-lg w-full text-gray-700 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-transform transform hover:scale-105 duration-200 ease-in-ou"
-              />
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  name="expiryDate"
-                  value={cardDetails.expiryDate}
-                  onChange={handleCardChange}
-                  placeholder="MM/YY"
-                  className="p-3 border border-gray-400 rounded-lg w-1/2 text-gray-700 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-transform transform hover:scale-105 duration-200 ease-in-out"
+        {/* Product Summary */}
+        {product && (
+          <div className="border-4 border-black bg-white p-6 mb-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <div className="flex flex-col md:flex-row gap-6 items-center">
+              
+              {/* Product Image */}
+              <div className="md:w-1/3 border-2 border-black p-4 bg-gray-50">
+                <img
+                  src={`${BASE_URL}/uploads/${product.image[0].split(/[\\/]/).pop()}`}
+                  alt={product.name}
+                  className="w-full h-40 object-contain"
                 />
+              </div>
+
+              {/* Product Details */}
+              <div className="md:w-2/3">
+                <h2 className="text-2xl font-bold text-black mb-2">{product.name}</h2>
+                <p className="text-gray-600 mb-4">{product.description}</p>
+                
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold text-black">
+                      ₹{(discountApplied ? discountedPrice : calculateTotalPrice()).toFixed(2)}
+                    </span>
+                    {product.originalPrice && (
+                      <span className="text-sm text-gray-400 line-through">
+                        ₹{(product.originalPrice * quantity).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quantity */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-bold text-gray-600">Qty:</label>
+                    <select
+                      value={quantity}
+                      onChange={handleQuantityChange}
+                      className="border-2 border-black p-2 focus:outline-none focus:ring-2 focus:ring-black text-black"
+                    >
+                      {[1,2,3,4,5].map(num => (
+                        <option key={num} value={num}>{num}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {discountApplied && (
+                  <p className="text-green-600 font-bold mt-2 flex items-center gap-2">
+                    <FaCheck /> Discount Applied: ₹{discountAmount} off
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: User Details */}
+        {step === 1 && (
+          <div className="border-4 border-black bg-white p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <h2 className="text-2xl font-bold text-black mb-6 border-b-2 border-black pb-2">
+              Step 1: Your Details
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Full Name
+                </label>
                 <input
                   type="text"
-                  name="cvv"
-                  value={cardDetails.cvv}
-                  onChange={handleCardChange}
-                  placeholder="CVV"
-                  className="p-3 border border-gray-400 rounded-lg w-1/2 text-gray-700 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-transform transform hover:scale-105 duration-200 ease-in-out"
+                  name="name"
+                  value={userDetails.name}
+                  onChange={handleChange}
+                  placeholder="John Doe"
+                  className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={userDetails.email}
+                  onChange={handleChange}
+                  placeholder="john@example.com"
+                  className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  name="phoneNumber"
+                  value={userDetails.phoneNumber}
+                  onChange={handleChange}
+                  placeholder="+91 9876543210"
+                  className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Address Line 1
+                </label>
+                <input
+                  type="text"
+                  name="line1"
+                  value={userDetails.address?.line1 || ''}
+                  onChange={handleChange}
+                  placeholder="Street address"
+                  className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Address Line 2
+                </label>
+                <input
+                  type="text"
+                  name="line2"
+                  value={userDetails.address?.line2 || ''}
+                  onChange={handleChange}
+                  placeholder="Apartment, suite, etc."
+                  className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  City
+                </label>
+                <input
+                  type="text"
+                  name="city"
+                  value={userDetails.address?.city || ''}
+                  onChange={handleChange}
+                  placeholder="Mumbai"
+                  className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  State
+                </label>
+                <input
+                  type="text"
+                  name="state"
+                  value={userDetails.address?.state || ''}
+                  onChange={handleChange}
+                  placeholder="Maharashtra"
+                  className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  ZIP Code
+                </label>
+                <input
+                  type="text"
+                  name="zip"
+                  value={userDetails.address?.zip || ''}
+                  onChange={handleChange}
+                  placeholder="400001"
+                  className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
                 />
               </div>
             </div>
-          )}
 
-          {/* Discount Code Section */}
-          <div className="mt-6 bg-gray-100 p-4 rounded-lg shadow-sm border border-gray-300 animate-fade-in">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3 animate-slide-up">
-              Apply Discount Code
-            </h3>
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={discountCode}
-                onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                placeholder="Enter discount code"
-                className="p-3 border border-gray-400 rounded-lg w-full text-gray-700 focus:ring-2 focus:ring-green-400 focus:border-green-400 transition-transform transform hover:scale-105 duration-200 ease-in-out"
-              />
+            <div className="flex justify-end mt-6">
               <button
-                onClick={applyDiscount}
-                disabled={discountApplied}
-                className={`p-3 rounded-lg w-1/3 font-semibold transition-transform transform ${discountApplied
-                  ? "bg-gray-500 text-white cursor-not-allowed"
-                  : "bg-green-500 hover:bg-green-600 text-white hover:scale-110 duration-200 ease-in-out"
-                  }`}
+                onClick={handleNextStep}
+                className="px-8 py-3 bg-black text-white font-semibold hover:bg-gray-800 transition-colors border-2 border-black flex items-center gap-2"
               >
-                {discountApplied ? "Applied" : "Apply"}
+                Continue to Payment <FaArrowRight />
               </button>
             </div>
-            {discountError && <p className="text-red-500 mt-2 animate-pulse">{discountError}</p>}
-            {discountApplied && (
-              <p className="text-green-500 mt-2 animate-slide-up">
-                🎉 Discount Applied! ₹{product.originalPrice - discountedPrice} off <br />
-                <span className="font-bold">New Price: ₹{discountedPrice.toFixed(2)}</span>
-              </p>
+          </div>
+        )}
+
+        {/* Step 2: Payment Method */}
+        {step === 2 && (
+          <div className="border-4 border-black bg-white p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <h2 className="text-2xl font-bold text-black mb-6 border-b-2 border-black pb-2">
+              Step 2: Payment Method
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {[
+                { value: 'creditCard', label: 'Credit Card', icon: <FaCreditCard /> },
+                { value: 'gpay', label: 'Google Pay', icon: <FaGooglePay /> },
+                { value: 'phonepay', label: 'PhonePe', icon: <FaPhone /> },
+                { value: 'paytm', label: 'Paytm', icon: <SiPaytm /> },
+                { value: 'paypal', label: 'PayPal', icon: <SiPaypal /> },
+                { value: 'netbanking', label: 'Net Banking', icon: <FaMoneyBill /> },
+                { value: 'cashOnDelivery', label: 'Cash on Delivery', icon: <FaMoneyBill /> },
+              ].map((method) => (
+                <button
+                  key={method.value}
+                  onClick={() => setPaymentMethod(method.value)}
+                  className={`flex items-center gap-3 p-4 border-2 transition-all ${
+                    paymentMethod === method.value
+                      ? 'border-black bg-black text-white'
+                      : 'border-gray-300 bg-white text-black hover:border-black'
+                  }`}
+                >
+                  <span className="text-xl">{method.icon}</span>
+                  <span className="font-medium">{method.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Credit Card Details */}
+            {paymentMethod === 'creditCard' && (
+              <div className="border-2 border-black p-4 mb-6">
+                <h3 className="font-bold text-black mb-4">Card Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <input
+                      type="text"
+                      name="cardNumber"
+                      value={cardDetails.cardNumber}
+                      onChange={handleCardChange}
+                      placeholder="Card Number"
+                      className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="expiryDate"
+                      value={cardDetails.expiryDate}
+                      onChange={handleCardChange}
+                      placeholder="MM/YY"
+                      className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="cvv"
+                      value={cardDetails.cvv}
+                      onChange={handleCardChange}
+                      placeholder="CVV"
+                      className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                    />
+                  </div>
+                </div>
+              </div>
             )}
+
+            {/* Discount Code */}
+            <div className="border-2 border-black p-4 mb-6">
+              <h3 className="font-bold text-black mb-4 flex items-center gap-2">
+                <FaTag /> Apply Discount Code
+              </h3>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                  placeholder="Enter code"
+                  className="flex-1 px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                />
+                <button
+                  onClick={applyDiscount}
+                  disabled={discountApplied}
+                  className={`px-6 py-3 font-semibold border-2 ${
+                    discountApplied
+                      ? 'bg-gray-300 text-gray-600 border-gray-300 cursor-not-allowed'
+                      : 'bg-black text-white border-black hover:bg-gray-800'
+                  }`}
+                >
+                  Apply
+                </button>
+              </div>
+              {discountError && <p className="text-red-600 mt-2">{discountError}</p>}
+              {discountApplied && (
+                <p className="text-green-600 mt-2 font-bold">
+                  Discount applied! You saved ₹{discountAmount}
+                </p>
+              )}
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="flex justify-between gap-4">
+              <button
+                onClick={handlePreviousStep}
+                className="px-6 py-3 bg-white text-black border-2 border-black font-semibold hover:bg-gray-100 transition-colors flex items-center gap-2"
+              >
+                <FaArrowLeft /> Back
+              </button>
+              <button
+                onClick={handleNextStep}
+                className="px-6 py-3 bg-black text-white font-semibold hover:bg-gray-800 transition-colors border-2 border-black flex items-center gap-2"
+              >
+                Review Order <FaArrowRight />
+              </button>
+            </div>
           </div>
+        )}
 
-          {/* Navigation Buttons */}
-          <div className="flex justify-between mt-6 animate-fade-in">
-            <button
-              onClick={handlePreviousStep}
-              className="w-1/3 p-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-transform transform hover:scale-105 duration-200 ease-in-out font-semibold"
-            >
-              Back
-            </button>
-            <button
-              onClick={handleNextStep}
-              className="w-1/3 p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-transform transform hover:scale-110 duration-200 ease-in-out font-semibold"
-            >
-              Next
-            </button>
+        {/* Step 3: Confirm Order */}
+        {step === 3 && (
+          <div className="border-4 border-black bg-white p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <h2 className="text-2xl font-bold text-black mb-6 border-b-2 border-black pb-2">
+              Step 3: Confirm Order
+            </h2>
+
+            {/* Order Summary */}
+            <div className="space-y-4 mb-6">
+              <div className="border-2 border-black p-4">
+                <h3 className="font-bold text-black mb-3">Shipping Address</h3>
+                <p className="text-gray-700">{userDetails.name}</p>
+                <p className="text-gray-700">{userDetails.address?.line1}</p>
+                {userDetails.address?.line2 && <p className="text-gray-700">{userDetails.address.line2}</p>}
+                <p className="text-gray-700">{userDetails.address?.city}, {userDetails.address?.state} - {userDetails.address?.zip}</p>
+                <p className="text-gray-700">Phone: {userDetails.phoneNumber}</p>
+                <p className="text-gray-700">Email: {userDetails.email}</p>
+              </div>
+
+              <div className="border-2 border-black p-4">
+                <h3 className="font-bold text-black mb-3">Payment Method</h3>
+                <p className="text-gray-700 flex items-center gap-2">
+                  {paymentIcons[paymentMethod]} {paymentMethod === 'creditCard' ? 'Credit Card' : 
+                    paymentMethod === 'gpay' ? 'Google Pay' :
+                    paymentMethod === 'phonepay' ? 'PhonePe' :
+                    paymentMethod === 'paytm' ? 'Paytm' :
+                    paymentMethod === 'paypal' ? 'PayPal' :
+                    paymentMethod === 'netbanking' ? 'Net Banking' : 'Cash on Delivery'}
+                </p>
+              </div>
+
+              <div className="border-2 border-black p-4">
+                <h3 className="font-bold text-black mb-3">Order Total</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="font-bold text-black">₹{calculateTotalPrice().toFixed(2)}</span>
+                  </div>
+                  {discountApplied && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount:</span>
+                      <span>-₹{discountAmount}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-gray-600">
+                    <span>Shipping:</span>
+                    <span>Free</span>
+                  </div>
+                  <div className="border-t-2 border-black pt-2 mt-2">
+                    <div className="flex justify-between font-bold text-black text-lg">
+                      <span>Total:</span>
+                      <span>₹{calculateTotalPrice().toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-between gap-4">
+              <button
+                onClick={handlePreviousStep}
+                className="px-6 py-3 bg-white text-black border-2 border-black font-semibold hover:bg-gray-100 transition-colors flex items-center gap-2"
+              >
+                <FaArrowLeft /> Back
+              </button>
+              <div className="flex-1">
+                {paymentMethod === 'paypal' ? (
+                  <>
+                    <div id="paypal-button-container" className="mt-4 min-h-[200px]"></div>
+                    {loading && (
+                      <div className="text-center mt-4">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <p className="text-gray-600 mt-2">{paymentStatus.success || 'Processing PayPal...'}</p>
+                      </div>
+                    )}
+                  </>
+                ) : paymentMethod === 'paytm' ? (
+                  <button
+                    onClick={handleConfirmPayment}
+                    className="w-full py-4 px-6 bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors border-2 border-blue-600 flex items-center justify-center gap-2 rounded-lg"
+                  >
+                    <SiPaytm className="text-xl" />
+                    Pay with Paytm
+                  </button>
+                ) : paymentMethod === 'cashOnDelivery' ? (
+                  <button
+                    onClick={handleConfirmPayment}
+                    className="w-full py-4 px-6 bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors border-2 border-green-600 flex items-center justify-center gap-2 rounded-lg"
+                  >
+                    <FaMoneyBill className="text-xl" />
+                    Place Order (COD)
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleConfirmPayment}
+                    disabled={loading}
+                    className={`w-full py-4 px-6 bg-black text-white font-semibold hover:bg-gray-800 transition-colors border-2 border-black flex items-center justify-center gap-2 rounded-lg ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <SiRazorpay className="text-xl" />
+                        Pay with Razorpay
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-
-
-      {/* Step 3: Confirm Payment */}
-      {step === 3 && (
-        <div className="bg-white shadow-lg rounded-xl p-6 md:p-8 w-full max-w-lg mx-auto border border-gray-300 transition-all duration-500 ease-in-out transform scale-95 hover:scale-100 animate-fadeIn">
-
-          {/* Heading */}
-          <h3 className="text-2xl font-bold text-gray-800 mb-5 text-center animate-slideUp">Confirm Purchase</h3>
-
-          {/* User Details */}
-          <div className="bg-gray-100 p-4 rounded-lg shadow-sm border border-gray-300 transition-all duration-500 ease-in-out hover:shadow-md">
-            <p className="mb-2 text-gray-700">
-              <span className="font-semibold">Name:</span> {userDetails.name}
-            </p>
-            <p className="mb-2 text-gray-700">
-              <span className="font-semibold">Email:</span> {userDetails.email}
-            </p>
-            <p className="mb-2 text-gray-700">
-              <span className="font-semibold">Phone:</span> {userDetails.phoneNumber}
-            </p>
-            <p className="mb-4 text-gray-700">
-              <span className="font-semibold">Payment Method:</span> {paymentMethod}
-            </p>
-          </div>
-
-          {/* Confirmation Message or Button */}
-          {confirmation ? (
-            <p className="text-green-500 font-semibold mt-4 animate-fadeIn">✅ Payment Confirmed!</p>
-          ) : (
-            <button onClick={handleConfirmPayment} className="w-full p-3 mt-4 bg-green-500 text-white rounded-lg font-semibold transition-all duration-300 ease-in-out transform hover:scale-105 hover:bg-green-600 focus:ring-2 focus:ring-green-400">
-              Confirm Payment
-            </button>
-          )}
-          <button onClick={handlePreviousStep} className="w-full p-3 mt-2 bg-gray-500 text-white rounded-lg font-semibold transition-all duration-300 ease-in-out transform hover:scale-105 hover:bg-gray-600 focus:ring-2 focus:ring-gray-400">
-            Back
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

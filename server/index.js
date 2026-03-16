@@ -22,6 +22,10 @@ import AdminRoutes from './routes/AdminRoutes.js';
 import SubscribeRoutes from './routes/SubscribeRoutes.js';
 import MessageRoutes from './routes/MessageRoutes.js';
 import DiscountRoutes from './routes/discountRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
+import accessoryRoutes from './routes/accessoryRoutes.js'
+import displayRoutes from './routes/displayRoutes.js';
+import customPCRoutes from './routes/customPCRoutes.js';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as FacebookStrategy } from 'passport-facebook';
 // @ts-ignore
@@ -31,10 +35,11 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+// const FRONTEND_URL = "http://192.168.0.109:5173";
 const io = new Server(server, {
-  cors: {
-    // origin: "*",
-    origin: "process.env.REACT_APP", // Your frontend's origin
+  cors: { 
+    // origin: '*',
+    origin: true, // Your frontend's origin
     methods: ["GET", "POST", 'PUT', 'DELETE'],
     credentials: true,
   },
@@ -42,15 +47,20 @@ const io = new Server(server, {
 
 app.use(cors({
   // origin: "*",
-  origin: 'process.env.REACT_APP',
-  methods: ["GET", "POST", 'PUT', 'DELETE'],
+  origin: true, // Your frontend's origin
   credentials: true,
+  methods: ["GET", "POST", 'PUT', 'DELETE', 'OPTIONS'],
 }));
 
 // Also add this middleware
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  // res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  // res.setHeader('X-Frame-Options', 'DENY');
+  // res.setHeader('X-Content-Type-Options', 'nosniff');
+  // res.setHeader('X-XSS-Protection', '1; mode=block');
+  // res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  // res.setHeader('Content-Security-Policy', "default-src 'self'");
   next();
 });
 
@@ -126,6 +136,11 @@ passport.use(new FacebookStrategy({
     let user = await User.findOne({ email });
 
     if (!user) {
+      // Generate discount code
+      const discountCode = generateDiscountCode();
+      const discountExpiresAt = new Date();
+      discountExpiresAt.setDate(discountExpiresAt.getDate() + 7);
+
       user = new User({
         facebookId: profile.id,
         name: profile.displayName,
@@ -133,8 +148,8 @@ passport.use(new FacebookStrategy({
         password: 'facebook_user', // Default password
         phoneNumber: profile.phoneNumber, // Can be updated later
         bonusPoints: 0,
-        discountCode: null,
-        discountExpiresAt: null,
+        discountCode,
+        discountExpiresAt,
         addresses: [],
       });
       await user.save();
@@ -149,20 +164,32 @@ passport.use(new TwitterStrategy({
   clientID: process.env.TWITTER_CONSUMER_KEY,
   clientSecret: process.env.TWITTER_CONSUMER_SECRET,
   callbackURL: process.env.TWITTER_CALLBACK_URL,
-  scope: ["tweet.read", "users.read", "offline.access"],
-  includeEmail: true,
-}, async (token, tokenSecret, profile, done) => {
+  clientType: 'confidential',
+  scope: ["tweet.read", "users.read"],
+  state: true,
+}, async (accessToken, refreshToken, profile, done) => {
   try {
     const email = profile.emails?.[0]?.value || `twitteruser${profile.id}@twitter.com`;
-    let user = await User.findOne({ email });
+    
+    let user = await User.findOne({ 
+      $or: [
+        { twitterId: profile.id },
+        { email: email }
+      ]
+    });
 
     if (!user) {
+      // Generate discount code
+      const discountCode = generateDiscountCode();
+      const discountExpiresAt = new Date();
+      discountExpiresAt.setDate(discountExpiresAt.getDate() + 7);
+
       user = new User({
-        name: profile.displayName,
+        name: profile.displayName || profile.username,
         email: email,
         twitterId: profile.id,
         password: 'twitter_user',
-        phoneNumber: profile.phoneNumber,
+        phoneNumber: 'Not Provided',
         bonusPoints: 0,
         discountCode: null,
         discountExpiresAt: null,
@@ -179,6 +206,16 @@ passport.use(new TwitterStrategy({
   }
 }
 ));
+
+// Helper function for discount code
+const generateDiscountCode = () => {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "WELCOME-";
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
 
 // Serialize and deserialize user for session management
 passport.serializeUser((user, done) => {
@@ -245,6 +282,10 @@ app.use('/api', AdminRoutes);
 app.use('/api', SubscribeRoutes);
 app.use('/api', MessageRoutes);
 app.use('/api', DiscountRoutes);
+app.use("/api/ai", aiRoutes);
+app.use('/api/accessories', accessoryRoutes);
+app.use('/api/displays', displayRoutes);
+app.use('/api/custom-pc', customPCRoutes);
 
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Connected to MongoDB'))
@@ -264,18 +305,34 @@ app.get("/socket.io", (req, res, next) => {
 //   failureRedirect: '/login',
 // }));
 
-// app.get('/auth/facebook', passport.authenticate('facebook'));
-// app.get('/auth/facebook/callback', passport.authenticate('facebook', {
-//   successRedirect: '/',
-//   failureRedirect: '/login',
-// }));
+// Add Facebook OAuth routes
+app.get('/auth/facebook', passport.authenticate('facebook', { 
+  scope: ['email', 'public_profile'] 
+}));
 
-// app.get('/auth/twitter', passport.authenticate('twitter'));
-// app.get('/auth/twitter/callback', passport.authenticate('twitter', {
-//   successRedirect: '/',
-//   failureRedirect: '/login',
-// }));
+app.get('/auth/facebook/callback', 
+  passport.authenticate('facebook', { 
+    failureRedirect: '/login?error=facebook_failed',
+    successRedirect: 'http://localhost:5173/profile',
+    session: true
+  })
+);
 
-server.listen(PORT, () => {
+app.get('/auth/twitter', 
+  passport.authenticate('twitter', {
+    scope: ['users.read', 'tweet.read'],
+    session: true
+  })
+);
+
+app.get('/auth/twitter/callback', 
+  passport.authenticate('twitter', { 
+    failureRedirect: '/login?error=twitter_failed',
+    successRedirect: 'http://localhost:5173/profile',
+    session: true
+  })
+);
+
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

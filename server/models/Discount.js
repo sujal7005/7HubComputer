@@ -1,13 +1,48 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const discountSchema = new mongoose.Schema({
-  code: { type: String, required: true, unique: true },  // Unique discount code
-  discountType: { type: String, enum: ["fixed", "percentage"], required: true }, // Fixed ₹ or percentage
-  value: { type: Number, required: true }, // Discount amount
-  expirationDate: { type: Date }, // Expiry date
-  minPurchase: { type: Number, default: 0 }, // Minimum order amount to apply discount
-  maxDiscount: { type: Number, default: null } // Maximum discount for percentage-based discounts
+  code: {
+    type: String,
+    required: true,
+    unique: true,
+    uppercase: true
+  },
+  discountType: {
+    type: String,
+    enum: ['fixed', 'percentage'],
+    required: true
+  },
+  value: {
+    type: Number,
+    required: true
+  },
+  expirationDate: {
+    type: Date,
+    default: null
+  },
+  minPurchase: {
+    type: Number,
+    default: 0
+  },
+  maxDiscount: {
+    type: Number,
+    default: null
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  usageCount: {
+    type: Number,
+    default: 0
+  },
+  maxUses: {
+    type: Number,
+    default: null
+  }
+}, {
+  timestamps: true
 });
 
-const Discount = mongoose.model("Discount", discountSchema);
+const Discount = mongoose.model('Discount', discountSchema);
 export default Discount;

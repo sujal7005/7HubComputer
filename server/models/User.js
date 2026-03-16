@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   twitterId: { type: String, unique: true, sparse: true },
   googleId: { type: String, unique: true, sparse: true },
   name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true, sparse: true },
   password: { type: String, required: true, default: 'facebook_user' },
   phoneNumber: { type: String, default: '' },
   bonusPoints: { type: Number, default: 0 },

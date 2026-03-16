@@ -10,6 +10,18 @@ export const googleSignin = async (req, res) => {
   console.log("Received Google Sign-In request:", req.body);
   const { idToken, accessToken } = req.body; // Extract Google token from request body
 
+  // Generate random discount code
+  const generateDiscountCode = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "WELCOME-";
+
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    return code;
+  };
+
   if (!idToken || !accessToken) {
     return res.status(400).json({ success: false, message: "Missing credentials" });
   }
@@ -61,7 +73,14 @@ export const googleSignin = async (req, res) => {
       console.log("User exists, logging in...");
     }
 
-    res.json({ success: true, user });
+    // Generate JWT token for the user
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ success: true, user, token });
   } catch (error) {
     console.error("Google sign-in error:", error);
     res.status(500).json({ success: false, message: "Google sign-in failed", error: error.message });
@@ -83,29 +102,54 @@ export const facebookSignin = async (req, res) => {
     .update(accessToken)
     .digest("hex");
 
+  // Generate random discount code
+  const generateDiscountCode = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "WELCOME-";
+
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    return code;
+  };
+  
   try {
     // Verify accessToken with Facebook API
     const fbResponse = await axios.get(`https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email,picture&appsecret_proof=${appsecret_proof}`);
     const { id, name, email } = fbResponse.data;
+    const phoneNumber = fbResponse.data.phoneNumbers?.[0]?.value || "Not Provided";
 
     let user = await User.findOne({ email });
 
     if (!user) {
+      // Generate discount code and expiration date
+      const discountCode = generateDiscountCode();
+      const discountExpiresAt = new Date();
+      discountExpiresAt.setDate(discountExpiresAt.getDate() + 7); // Expires in 7 days
+
       user = new User({
         facebookId: id,
         name,
         email: email || `fbuser${id}@facebook.com`,
         password: 'facebook_user', // Default password
-        phoneNumber: '',
+        phoneNumber,
         bonusPoints: 0,
-        discountCode: null,
-        discountExpiresAt: null,
+        discountCode,
+        discountExpiresAt,
         addresses: [],
       });
       await user.save();
     }
 
-    res.json({ success: true, user });
+    // Generate JWT token for the user
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ success: true, user, token });
   } catch (error) {
     console.error("Facebook Sign-in Error:", error);
     res.status(500).json({ success: false, message: 'Facebook sign-in failed' });

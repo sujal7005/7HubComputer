@@ -26,8 +26,15 @@ const SearchResults = lazy(() => import('./pages/SearchResults'));
 const Laptop = lazy(() => import('./pages/Laptop'));
 const MiniPC = lazy(() => import('./pages/MiniPCs'));
 const AllInOnePCs = lazy(() => import('./pages/AllInOnePCs'));
+const Accessibility = lazy(() => import('./pages/Accessibility.jsx'))
+const Display = lazy(() => import('./pages/Display.jsx'));
+const DisplayDetails = lazy(() => import('./components/DisplayDetails.jsx'));
 const Payment = lazy(() => import('./components/Payment'));
+const PaymentSuccess = lazy(() => import('./components/PaymentSuccess.jsx'));
+const PaymentCancel = lazy(() => import('./components/PaymentCancel.jsx'));
+const AIAssistant = lazy(() => import( './components/AIAssistant.jsx'))
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const AccessoryDetails = lazy(() => import('./components/AccessoryDetails.jsx'));
 
 const App = () => {
   useEffect(() => {
@@ -37,12 +44,14 @@ const App = () => {
   const location = useLocation();
   const nodeRef = useRef(null);
 
+  const isAdminRoute = location.pathname === '/admin';
+
   return (
     <HelmetProvider>
       <div className="min-h-screen bg-gray-100 text-gray-800">
-        <Header />
+        {!isAdminRoute && <Header />}
         <Cookies />
-        <main className="container mx-auto py-8 px-4 mt-20">
+        <main className="mx-auto py-8 px-4 mt-20">
           <div ref={nodeRef}>
             <PageTransition in={true} nodeRef={nodeRef}>
               <Suspense fallback={
@@ -65,7 +74,10 @@ const App = () => {
                   <Route path="/all-in-one-pcs" element={<AllInOnePCs />} />
                   <Route path="/pc/:id" element={<ProductDetails />} />
                   <Route path="/refurbished/:id" element={<ProductDetails />} />
+                  <Route path="/accessories/:id" element={<AccessoryDetails />} />
                   <Route path='/payment' element={<Payment />} />
+                  <Route path='/payment/success' element={<PaymentSuccess />} />
+                  <Route path='/payment/cancel' element={<PaymentCancel />} />
                   <Route path='/laptops' element={<Laptop />} />
                   <Route path="/custom" element={<CustomPC />} />
                   <Route path="/about" element={<About />} />
@@ -76,12 +88,16 @@ const App = () => {
                   <Route path='/support' element={<Support />} />
                   <Route path="/search" element={<SearchResults />} />
                   <Route path="/7hubcomputer-details" element={<HubComputerDetails />} />
+                  <Route path='/ai-assistant' element={<AIAssistant />} />
+                  <Route path='/accessibility' element={<Accessibility />} />
+                  <Route path='/display' element={<Display />} />
+                  <Route path='/display/:id' element={<DisplayDetails />} />
                 </Routes>
               </Suspense>
             </PageTransition>
           </div>
         </main>
-        <Footer />
+        {!isAdminRoute && <Footer />}
       </div>
     </HelmetProvider>
   );

@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const refurbishedLaptopSchema = new mongoose.Schema({
     type: { 
         type: String,
-        enum: ['New', 'Refurbished'],
+        enum: ['New', 'Refurbished', 'Refurbished Laptop'],
         required: true, 
     },
     id: { type: String, required: true },
@@ -14,6 +14,15 @@ const refurbishedLaptopSchema = new mongoose.Schema({
     image: { type: [String], required: true },
     brand: { type: String, required: true },
     quantity: { type: Number, default: 1 },
+    additionalImages: { type: [String], default: [] },
+    videos: [{
+        title: { type: String, default: "" },
+        url: { type: String, default: "" }
+    }],
+    keyFeatures: [{
+        title: String,
+        description: String
+    }],
     specs: {
         cpu: { type: String, required: true },
         ram: { type: String, required: true },
@@ -33,6 +42,13 @@ const refurbishedLaptopSchema = new mongoose.Schema({
         enum: ['Excellent', 'Good', 'Fair', 'Poor'],
         required: true,
     },
+    specifications: [{
+        title: String,
+        specs: [{
+          name: String,
+          value: String
+        }]
+    }],
     notes: { type: [String], required: true },
     code: { type: String, required: true },
     price: { type: Number, required: true },

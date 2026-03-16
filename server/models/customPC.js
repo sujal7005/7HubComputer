@@ -1,93 +1,58 @@
-// models/customPC.js
 import mongoose from 'mongoose';
 
-const CustomPCSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, required: true },
-  id: String,
+const ComponentOptionSchema = new mongoose.Schema({
   name: String,
-  basePrice: Number,
-  customizableOptions: {
-    CPU: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    GPU: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    RAM: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    SSD: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    HDD: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    Motherboard: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    PowerSupply: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    CPUCooler: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    ComputerCase: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    WiFiCard: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
-    Ports: [
-      {
-        name: String,
-        price: Number,
-        image: String,
-      },
-    ],
+  price: Number,
+  image: String,
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' }
+});
+
+const CustomPCSchema = new mongoose.Schema({
+  userId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User',
+    required: true 
   },
-  dateAdded: Date,
-  totalPrice: Number,
-}, { timestamps: true });
+  name: {
+    type: String,
+    default: 'Custom PC Configuration'
+  },
+  configuration: {
+    CPU: ComponentOptionSchema,
+    GPU: ComponentOptionSchema,
+    RAM: ComponentOptionSchema,
+    SSD: ComponentOptionSchema,
+    HDD: ComponentOptionSchema,
+    Motherboard: ComponentOptionSchema,
+    PowerSupply: ComponentOptionSchema,
+    CPUCooler: ComponentOptionSchema,
+    ComputerCase: ComponentOptionSchema,
+    WiFiCard: ComponentOptionSchema,
+    Ports: ComponentOptionSchema
+  },
+  totalPrice: {
+    type: Number,
+    required: true
+  },
+  dateAdded: {
+    type: Date,
+    default: Date.now
+  },
+  isPublic: {
+    type: Boolean,
+    default: false
+  },
+  compatibilityStatus: {
+    type: String,
+    enum: ['compatible', 'incompatible', 'unknown'],
+    default: 'unknown'
+  }
+}, { 
+  timestamps: true 
+});
+
+// Add index for faster queries
+CustomPCSchema.index({ userId: 1, createdAt: -1 });
 
 const CustomPC = mongoose.model('CustomPC', CustomPCSchema);
 export default CustomPC;

@@ -10,6 +10,15 @@ const officePCSchema = new mongoose.Schema({
   image: { type: [String], required: true },
   brand: { type: String, required: true },
   quantity: { type: Number, default: 1 },
+  additionalImages: { type: [String], default: [] },
+  videos: [{
+    title: { type: String, default: "" },
+    url: { type: String, default: "" }
+  }],
+  keyFeatures: [{
+    title: String,
+    description: String
+  }],
   specs: {
     platform: { type: String, required: true },
     cpu: { type: String, required: true },
@@ -20,6 +29,13 @@ const officePCSchema = new mongoose.Schema({
     smps: { type: String, required: true },
     cabinet: { type: String, required: true },
   },
+  specifications: [{
+    title: String,
+    specs: [{
+      name: String,
+      value: String
+    }]
+  }],
   otherTechnicalDetails: [
     { name: { type: String }, value: { type: String } },
   ],

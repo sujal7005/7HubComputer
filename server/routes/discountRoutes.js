@@ -4,10 +4,49 @@ import User from "../models/User.js";
 
 const router = Router();
 
+// CREATE Discount Code (POST)
+router.post("/discounts", async (req, res) => {
+  try {
+    const { code, discountType, value, expirationDate, minPurchase, maxDiscount } = req.body;
+
+    // Validate required fields
+    if (!code || !discountType || !value) {
+      return res.status(400).json({ error: "Code, discount type, and value are required." });
+    }
+
+    // Check if discount code already exists
+    const existingDiscount = await Discount.findOne({ code: code.toUpperCase() });
+    if (existingDiscount) {
+      return res.status(400).json({ error: "Discount code already exists." });
+    }
+
+    // Create new discount
+    const newDiscount = new Discount({
+      code: code.toUpperCase(), // Store codes in uppercase for consistency
+      discountType,
+      value: Number(value),
+      expirationDate: expirationDate || null,
+      minPurchase: minPurchase ? Number(minPurchase) : 0,
+      maxDiscount: maxDiscount ? Number(maxDiscount) : null,
+      isActive: true
+    });
+
+    await newDiscount.save();
+
+    res.status(201).json({ 
+      message: "Discount code created successfully!", 
+      discount: newDiscount 
+    });
+  } catch (error) {
+    console.error("Error creating discount:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET All Discounts
 router.get("/discounts", async (req, res) => {
   try {
-    const discounts = await Discount.find(); // Fetch all discounts
+    const discounts = await Discount.find().sort({ createdAt: -1 }); // Fetch all discounts, newest first
     res.json(discounts);
   } catch (error) {
     console.error("Error fetching discounts:", error);
@@ -19,7 +58,7 @@ router.get("/discounts", async (req, res) => {
 router.get("/discounts/:code", async (req, res) => {
   try {
     const { code } = req.params;
-    const discount = await Discount.findOne({ code });
+    const discount = await Discount.findOne({ code: code.toUpperCase() });
 
     if (!discount) {
       return res.status(404).json({ error: "Discount code not found." });
@@ -44,10 +83,10 @@ router.post("/apply-discount", async (req, res) => {
     }
 
     // Check in both Discount collection and User collection
-    let discount = await Discount.findOne({ code });
+    let discount = await Discount.findOne({ code: code.toUpperCase() });
 
     if (!discount) {
-      const userWithDiscount = await User.findOne({ discountCode: code });
+      const userWithDiscount = await User.findOne({ discountCode: code.toUpperCase() });
 
       if (userWithDiscount) {
         discount = {
@@ -103,6 +142,11 @@ router.put("/discounts/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updatedData = req.body;
+
+    // If code is being updated, convert to uppercase
+    if (updatedData.code) {
+      updatedData.code = updatedData.code.toUpperCase();
+    }
 
     const updatedDiscount = await Discount.findByIdAndUpdate(id, updatedData, { new: true });
 

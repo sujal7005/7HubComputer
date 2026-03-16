@@ -7,6 +7,8 @@ import orderController from '../controllers/orderController.js';
 
 const router = Router();
 
+router.get('/orders/generate-invoice-pdf/:id', orderController.generateInvoicePDF);
+
 router.get('/:userId', async (req, res) => {
     try {
         const user = await User.findById(req.params.userId);
@@ -27,8 +29,6 @@ router.get('/:userId/orders', async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
-
-router.get('/orders/generate-invoice-pdf/:id', orderController.generateInvoicePDF);
 
 router.get('/:userId/addresses', async (req, res) => {
     try {

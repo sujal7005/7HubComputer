@@ -158,6 +158,7 @@ export const createProducts = async (req, res) => {
   const {
     id, name, price, category, description, popularity, type, otherTechnicalDetails, notes,
     originalPrice, brand, stock, code, condition, discount, bonuses, dateAdded, customId,
+    keyFeatures, specifications, additionalImages, videos,
     // Pre-Built PC-specific fields
     platform, cpu, motherboard, ramOptions, storage1Options, storage2Options,
     liquidcooler, graphiccard, smps, cabinet,
@@ -165,13 +166,69 @@ export const createProducts = async (req, res) => {
     os, display, storage, ram,
   } = req.body;
 
-  // Parse otherTechnicalDetails and notes if they are strings resembling JSON
-  if (typeof otherTechnicalDetails === 'string') {
-    try {
-      req.body.otherTechnicalDetails = JSON.parse(otherTechnicalDetails);
-    } catch (err) {
-      console.error("Error parsing otherTechnicalDetails:", err);
-      return res.status(400).json({ message: 'Invalid otherTechnicalDetails format' });
+    // Parse otherTechnicalDetails if they are strings resembling JSON
+  let parsedOtherTechnicalDetails = [];
+  if (otherTechnicalDetails) {
+    if (typeof otherTechnicalDetails === 'string') {
+      try {
+        parsedOtherTechnicalDetails = JSON.parse(otherTechnicalDetails);
+      } catch (err) {
+        console.error("Error parsing otherTechnicalDetails:", err);
+      }
+    } else if (Array.isArray(otherTechnicalDetails)) {
+      parsedOtherTechnicalDetails = otherTechnicalDetails;
+    }
+  }
+
+  // Parse keyFeatures
+  let parsedKeyFeatures = [];
+  if (keyFeatures) {
+    if (typeof keyFeatures === 'string') {
+      try {
+        // Try to parse as JSON
+        parsedKeyFeatures = JSON.parse(keyFeatures);
+        console.log("Parsed keyFeatures from string:", parsedKeyFeatures);
+      } catch (err) {
+        console.error("Error parsing keyFeatures string:", err);
+        // If it's not valid JSON, maybe it's a single string
+        parsedKeyFeatures = [{ title: keyFeatures, description: "" }];
+      }
+    } else if (Array.isArray(keyFeatures)) {
+      parsedKeyFeatures = keyFeatures;
+      console.log("keyFeatures is already an array:", parsedKeyFeatures);
+    }
+  }
+  
+  // Parse specifications
+  let parsedSpecifications = [];
+  if (specifications) {
+    if (typeof specifications === 'string') {
+      try {
+        parsedSpecifications = JSON.parse(specifications);
+        console.log("Parsed specifications from string:", parsedSpecifications);
+      } catch (err) {
+        console.error("Error parsing specifications string:", err);
+        parsedSpecifications = [];
+      }
+    } else if (Array.isArray(specifications)) {
+      parsedSpecifications = specifications;
+      console.log("specifications is already an array:", parsedSpecifications);
+    }
+  }
+  
+  // Parse videos
+  let parsedVideos = [];
+  if (videos) {
+    if (typeof videos === 'string') {
+      try {
+        parsedVideos = JSON.parse(videos);
+        console.log("Parsed videos from string:", parsedVideos);
+      } catch (err) {
+        console.error("Error parsing videos string:", err);
+        parsedVideos = [];
+      }
+    } else if (Array.isArray(videos)) {
+      parsedVideos = videos;
     }
   }
 
@@ -206,12 +263,18 @@ export const createProducts = async (req, res) => {
     return res.status(500).json({ message: "Error checking product uniqueness" });
   }
 
-  const imageUrls = req.files.map((file) => file.path); // Collect paths of all uploaded files
+  // Separate main images from additional images
+  // In the request, main images are sent as 'image' field, additional as 'additionalImages'
+  const mainImageFiles = req.files.filter(file => file.fieldname === 'image');
+  const additionalImageFiles = req.files.filter(file => file.fieldname === 'additionalImages');
+
+  const mainImageUrls = mainImageFiles.map((file) => file.path);
+  const additionalImageUrls = additionalImageFiles.map((file) => file.path);
 
   console.log("Product ID is unique, proceeding to save the product.");
 
   // Validate uploaded files
-  if (imageUrls.length === 0) {
+  if (mainImageUrls.length === 0) {
     return res.status(400).json({ message: "No valid images or image data provided" });
   }
 
@@ -219,7 +282,12 @@ export const createProducts = async (req, res) => {
   const productDataWithImages = {
     id, productId, name, price, category, description, popularity, type,
     otherTechnicalDetails: req.body.otherTechnicalDetails, notes, originalPrice, brand,
-    stock, code, condition, discount, bonuses, dateAdded, customId, image: imageUrls,
+    stock, code, condition, discount, bonuses, dateAdded, customId, 
+    image: mainImageUrls,
+    additionalImages: additionalImageUrls,
+    keyFeatures: parsedKeyFeatures,
+    specifications: parsedSpecifications,
+    videos: parsedVideos,
   };
 
   if (type === "Pre-Built PC") {
@@ -294,7 +362,6 @@ export const createProducts = async (req, res) => {
 export const updateProduct = async (req, res) => {
   const { productType, productId } = req.params;
 
-
   const normalizedProductType = productType.toLowerCase().replace(/\s+/g, '-');
 
   // Select the model based on the productType
@@ -303,9 +370,9 @@ export const updateProduct = async (req, res) => {
     ProductModel = RefurbishedLaptop;
   } else if (normalizedProductType === 'pre-built-pc') {
     ProductModel = PreBuildPC;
-  } else if (normalizedProductType === 'mini-pc') { // Add support for MiniPC
+  } else if (normalizedProductType === 'mini-pc') {
     ProductModel = MiniPCs;
-  } else if (normalizedProductType === 'office-pc') { // Add support for Office PC
+  } else if (normalizedProductType === 'office-pc') {
     ProductModel = OfficePC;
   } else {
     return res.status(400).json({ message: 'Invalid product type' });
@@ -325,7 +392,7 @@ export const updateProduct = async (req, res) => {
 
   // Now you can query with a valid ObjectId
   try {
-    const query = { _id: validProductId }; // Correct ObjectId usage
+    const query = { _id: validProductId };
     console.log("Querying database with:", query);
 
     const product = await ProductModel.findOne(query);
@@ -336,11 +403,20 @@ export const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Handle uploaded files
-    const files = req.files || [];
-    const filePaths = files.map(file => file.path);
-    const reviewImageFile = req.body.reviewImageFile || null;
-    console.log('Uploaded files:', filePaths);
+    // Handle uploaded files - req.files is an object with fields, not an array
+    const files = req.files || {};
+    
+    // Get files from different fields
+    const mainImageFiles = files.image || [];
+    const additionalImageFiles = files.additionalImages || [];
+
+    const mainImageUrls = mainImageFiles.map(file => file.path);
+    const additionalImageUrls = additionalImageFiles.map(file => file.path);
+
+    console.log('Uploaded files:', { 
+      mainImages: mainImageUrls.length, 
+      additionalImages: additionalImageUrls.length 
+    });
 
     // Update reviews if new review data is provided
     if (req.body.reviewerName && req.body.rating && req.body.comment) {
@@ -349,32 +425,184 @@ export const updateProduct = async (req, res) => {
         reviewerName: req.body.reviewerName,
         rating: Number(req.body.rating),
         comment: req.body.comment,
-        reviewimage: reviewImageFile ? reviewImageFile : null, // Save review image if available
+        reviewimage: req.body.reviewImageFile || null,
       };
 
       product.reviews.push(newReview);
     }
 
-    // Update product with new data
-    const updates = {
-      ...req.body,
-      image: filePaths.length > 0 ? filePaths : product.image, // Update images if new files are uploaded
-      reviews: product.reviews, // Ensure the reviews array is updated
-      otherTechnicalDetails: Array.isArray(req.body.otherTechnicalDetails)
-        ? req.body.otherTechnicalDetails
-        : JSON.parse(req.body.otherTechnicalDetails), // Correcting the format if it's a string
-      inStock: req.body.stock === "false" || req.body.stock === false ? false : true,
-    };
+    // Handle keyFeatures - parse if string, otherwise use as is
+    let parsedKeyFeatures = product.keyFeatures || [];
+    if (req.body.keyFeatures !== undefined) {
+      if (typeof req.body.keyFeatures === 'string') {
+        try {
+          const parsed = JSON.parse(req.body.keyFeatures);
+          parsedKeyFeatures = Array.isArray(parsed) ? parsed : [];
+          console.log("Parsed keyFeatures from string:", parsedKeyFeatures);
+        } catch (err) {
+          console.error("Error parsing keyFeatures string:", err);
+          parsedKeyFeatures = [];
+        }
+      } else if (Array.isArray(req.body.keyFeatures)) {
+        parsedKeyFeatures = req.body.keyFeatures
+          .filter(item => item && typeof item === 'object')
+          .map(item => ({
+            title: item.title || "",
+            description: item.description || ""
+          }));
+        console.log("Parsed keyFeatures from array:", parsedKeyFeatures);
+      }
+    }
+    
+    // Handle specifications - parse if string, otherwise use as is
+    let parsedSpecifications = product.specifications || [];
+    if (req.body.specifications !== undefined) {
+      if (typeof req.body.specifications === 'string') {
+        try {
+          const parsed = JSON.parse(req.body.specifications);
+          parsedSpecifications = Array.isArray(parsed) ? parsed : [];
+          console.log("Parsed specifications from string:", parsedSpecifications);
+        } catch (err) {
+          console.error("Error parsing specifications string:", err);
+          parsedSpecifications = [];
+        }
+      } else if (Array.isArray(req.body.specifications)) {
+        parsedSpecifications = req.body.specifications
+          .filter(item => item && typeof item === 'object')
+          .map(item => ({
+            title: item.title || "",
+            specs: Array.isArray(item.specs) 
+              ? item.specs.map(s => ({ name: s.name || "", value: s.value || "" }))
+              : []
+          }));
+        console.log("Parsed specifications from array:", parsedSpecifications);
+      }
+    }
+    
+    // Handle videos - parse if string, otherwise use as is
+    let parsedVideos = product.videos || [];
+    if (req.body.videos !== undefined) {
+      if (typeof req.body.videos === 'string') {
+        try {
+          const parsed = JSON.parse(req.body.videos);
+          parsedVideos = Array.isArray(parsed) ? parsed : [];
+        } catch (err) {
+          console.error("Error parsing videos string:", err);
+          parsedVideos = [];
+        }
+      } else if (Array.isArray(req.body.videos)) {
+        parsedVideos = req.body.videos
+          .filter(item => item && typeof item === 'object')
+          .map(item => ({
+            title: item.title || "",
+            url: item.url || ""
+          }));
+      }
+    }
+
+    // Handle otherTechnicalDetails
+    let parsedOtherTechnicalDetails = product.otherTechnicalDetails || [];
+    if (req.body.otherTechnicalDetails !== undefined) {
+      if (typeof req.body.otherTechnicalDetails === 'string') {
+        try {
+          const parsed = JSON.parse(req.body.otherTechnicalDetails);
+          parsedOtherTechnicalDetails = Array.isArray(parsed) ? parsed : [];
+        } catch (err) {
+          console.error("Error parsing otherTechnicalDetails:", err);
+          parsedOtherTechnicalDetails = [];
+        }
+      } else if (Array.isArray(req.body.otherTechnicalDetails)) {
+        parsedOtherTechnicalDetails = req.body.otherTechnicalDetails;
+      }
+    }
+
+    // Build updates object
+    const updates = {};
+
+    // Only add fields if they are provided in the request
+    if (req.body.name !== undefined) updates.name = req.body.name;
+    if (req.body.price !== undefined) updates.price = req.body.price;
+    if (req.body.description !== undefined) updates.description = req.body.description;
+    if (req.body.brand !== undefined) updates.brand = req.body.brand;
+    if (req.body.category !== undefined) updates.category = req.body.category;
+    if (req.body.condition !== undefined) updates.condition = req.body.condition;
+    if (req.body.code !== undefined) updates.code = req.body.code;
+    if (req.body.popularity !== undefined) updates.popularity = req.body.popularity;
+    if (req.body.originalPrice !== undefined) updates.originalPrice = req.body.originalPrice;
+    if (req.body.discount !== undefined) updates.discount = req.body.discount;
+    if (req.body.bonuses !== undefined) updates.bonuses = req.body.bonuses;
+    if (req.body.dateAdded !== undefined) updates.dateAdded = req.body.dateAdded;
+    
+    // Handle stock
+    if (req.body.stock !== undefined) {
+      updates.inStock = req.body.stock === "false" || req.body.stock === false ? false : true;
+    }
+
+    // Handle images
+    if (mainImageUrls.length > 0) {
+      updates.image = mainImageUrls;
+    }
+
+    // Handle additional images - append new ones to existing
+    if (additionalImageUrls.length > 0) {
+      updates.additionalImages = [...(product.additionalImages || []), ...additionalImageUrls];
+    }
+
+    // CRITICAL FIX: Always set these fields even if empty array
+    updates.keyFeatures = parsedKeyFeatures;
+    updates.specifications = parsedSpecifications;
+    updates.videos = parsedVideos;
+    updates.otherTechnicalDetails = parsedOtherTechnicalDetails;
+
+    // Handle specs based on product type
+    if (req.body.cpu !== undefined || req.body.ram !== undefined || req.body.storage !== undefined) {
+      // Initialize specs object
+      const specs = { ...(product.specs || {}) };
+      
+      // Update individual spec fields if provided
+      if (req.body.cpu !== undefined) specs.cpu = req.body.cpu;
+      if (req.body.ram !== undefined) specs.ram = req.body.ram;
+      if (req.body.storage !== undefined) specs.storage = req.body.storage;
+      if (req.body.graphiccard !== undefined) specs.graphiccard = req.body.graphiccard;
+      if (req.body.display !== undefined) specs.display = req.body.display;
+      if (req.body.os !== undefined) specs.os = req.body.os;
+      if (req.body.platform !== undefined) specs.platform = req.body.platform;
+      if (req.body.motherboard !== undefined) specs.motherboard = req.body.motherboard;
+      if (req.body.smps !== undefined) specs.smps = req.body.smps;
+      if (req.body.cabinet !== undefined) specs.cabinet = req.body.cabinet;
+      
+      updates.specs = specs;
+    }
+
+    // If specs is provided as a JSON string, parse it
+    if (req.body.specs !== undefined) {
+      if (typeof req.body.specs === 'string') {
+        try {
+          updates.specs = JSON.parse(req.body.specs);
+        } catch (err) {
+          console.error("Error parsing specs:", err);
+        }
+      } else if (typeof req.body.specs === 'object') {
+        updates.specs = req.body.specs;
+      }
+    }
+
+    console.log("Updates to apply:", JSON.stringify(updates, null, 2));
 
     const updatedProduct = await ProductModel.findOneAndUpdate(query, updates, {
       new: true,
+      runValidators: true,
     });
-    console.log('Updated product:', updatedProduct);
-
+    
+    console.log('Updated product successfully');
+    console.log('Updated keyFeatures:', updatedProduct.keyFeatures);
+    console.log('Updated specifications:', updatedProduct.specifications);
+    
     res.status(200).json(updatedProduct);
+    
   } catch (error) {
     console.error('Error updating product:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
 
@@ -388,10 +616,10 @@ export const deleteProduct = async (req, res, next) => {
       ProductModel = PreBuildPC;
     } else if (productType === 'refurbished') {
       ProductModel = RefurbishedLaptop;
-    } else if (productType === "mini-pc") { // Add support for MiniPC
+    } else if (productType === "mini-pc") {
       ProductModel = MiniPCs;
-    } else if (normalizedProductType === 'office-pc') { // Add support for Office PC
-      ProductModel = Office - PCs;
+    } else if (productType === "office-pc") {
+      ProductModel = OfficePC;
     } else {
       return res.status(400).json({ error: "Invalid product type" });
     }
@@ -404,20 +632,25 @@ export const deleteProduct = async (req, res, next) => {
     }
 
     // Delete associated images from the file system (if any)
-    if (product.images && Array.isArray(product.images)) {
-      product.images.forEach((image) => {
-        const imagePath = path.resolve('uploads', image); // Assuming 'image' is the filename stored in DB
-        if (fs.existsSync(imagePath)) {
-          fs.unlinkSync(imagePath); // Delete the image file
-        }
-      });
-    }
+    const allImages = [
+      ...(product.image || []),
+      ...(product.additionalImages || [])
+    ];
+    
+    allImages.forEach((image) => {
+      // Extract filename from path
+      const filename = path.basename(image);
+      const imagePath = path.resolve('uploads', filename);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath); // Delete the image file
+        console.log(`Deleted image: ${imagePath}`);
+      }
+    });
 
     // Delete the product from the database
     await ProductModel.findByIdAndDelete(productId);
 
-    // Call next middleware if no error
-    next();
+    res.json({ success: true, message: "Product deleted successfully" });
   } catch (error) {
     console.error("Error deleting product:", error);
     res.status(500).json({ error: "Server error while deleting product" });

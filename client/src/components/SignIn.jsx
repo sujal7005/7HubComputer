@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import FacebookLogin from "@greatsumini/react-facebook-login";
-import { FaFacebook, FaTwitter } from "react-icons/fa";
+import { FaFacebook, FaTwitter, FaEnvelope, FaLock, FaUser, FaPhone, FaEye, FaEyeSlash } from "react-icons/fa";
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const SignIn = () => {
@@ -29,20 +30,8 @@ const SignIn = () => {
     const user = localStorage.getItem('user');
     if (user) {
       const parsedUser = JSON.parse(user);
-      setUserId(parsedUser._id); // Assuming user object has an 'id' field
+      setUserId(parsedUser._id);
     }
-  }, []);
-
-  useEffect(() => {
-    google.accounts.id.initialize({
-      client_id: "902643667030-1l6l00sgj4lp7k7voht4rep5rr7svdfu.apps.googleusercontent.com",
-      callback: handleGoogleLoginSuccess,
-    });
-  
-    google.accounts.id.renderButton(
-      document.getElementById("google-login-btn"), 
-      { theme: "outline", size: "large" }
-    );
   }, []);
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -123,11 +112,11 @@ const SignIn = () => {
 
     try {
       if (isSignUp) {
-        // Update the API URL to the correct port
         console.log({ name, email, password, phoneNumber });
         const response = await axios.post('http://localhost:4000/api/signup', { name, email, password, phoneNumber });
         if (response.data.success) {
           localStorage.setItem('user', JSON.stringify(response.data.user));
+          localStorage.setItem('token', response.data.token);
           setUserId(response.data.user._id);
           navigate('/profile');
         } else {
@@ -137,6 +126,7 @@ const SignIn = () => {
         const response = await axios.post('http://localhost:4000/api/signin', { email, password });
         if (response.data.success) {
           localStorage.setItem('user', JSON.stringify(response.data.user));
+          localStorage.setItem('token', response.data.token);
           setUserId(response.data.user._id);
           navigate('/profile');
         } else {
@@ -144,7 +134,7 @@ const SignIn = () => {
         }
       }
     } catch (error) {
-      console.error("Sign up error: ", error.response?.data || error.message); // Log the error for debugging
+      console.error("Sign up error: ", error.response?.data || error.message);
       setError('An error occurred. Please try again.');
     }
   };
@@ -159,20 +149,18 @@ const SignIn = () => {
     }
 
     try {
-      // Fetch the access token from Google
       const tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: "902643667030-1l6l00sgj4lp7k7voht4rep5rr7svdfu.apps.googleusercontent.com",
         scope: "profile email https://www.googleapis.com/auth/user.phonenumbers.read",
         callback: async (tokenResponse) => {
           console.log("Access Token:", tokenResponse.access_token);
 
-          // Now send both ID token and access token to the backend
           const res = await fetch("http://localhost:4000/api/google-signin", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              idToken: credential,       // ✅ Google ID token
-              accessToken: tokenResponse.access_token, // ✅ Access token for People API
+              idToken: credential,
+              accessToken: tokenResponse.access_token,
             }),
           });
 
@@ -180,6 +168,10 @@ const SignIn = () => {
           console.log("Backend response:", data);
           if (data.success) {
             localStorage.setItem('user', JSON.stringify(data.user));
+            // If your backend sends a token for Google sign-in, store it too
+            if (data.token) {
+              localStorage.setItem('token', data.token);
+            }
             setUserId(data.user._id);
             navigate('/profile');
           } else {
@@ -188,7 +180,7 @@ const SignIn = () => {
         },
       });
 
-      tokenClient.requestAccessToken(); // 🔥 Request access token
+      tokenClient.requestAccessToken();
 
     } catch (err) {
       setError(err.response?.data?.message || "An error occurred during Google login");
@@ -212,6 +204,10 @@ const SignIn = () => {
 
       if (res.data.success) {
         localStorage.setItem('user', JSON.stringify(res.data.user));
+        // If your backend sends a token for Google sign-in, store it too
+        if (res.data.token) {
+          localStorage.setItem('token', res.data.token);
+        }
         setUserId(res.data.user._id);
         navigate('/profile');
       } else {
@@ -223,276 +219,369 @@ const SignIn = () => {
     }
   };
 
-  // Twitter login success handler
-  const handleTwitterLoginSuccess = async (response) => {
-    console.log("Twitter login response:", response);
-
-    const { oauth_token, oauth_token_secret } = response;
-
-    if (!oauth_token || !oauth_token_secret) {
-      console.error("Missing OAuth tokens");
-      setError("Twitter authentication failed. Missing OAuth tokens.");
-      return;
-    }
-
-    try {
-      const response = await axios.post('http://localhost:4000/api/twitter-signin', { oauth_token, oauth_token_secret });
-      if (response.data.url) {
-        window.location.href = response.data.url;
-        navigate('/profile');
-      } else {
-        setError(res.data.message || 'Twitter Sign-In failed');
-      }
-    } catch (err) {
-      setError('An error occurred during Twitter login');
-      console.error('Error during Twitter login:', err);
-    }
+  // Update the Twitter login button in your SignIn.jsx
+  const handleTwitterLogin = () => {
+    // Store the current location to redirect back
+    localStorage.setItem('redirectAfterLogin', window.location.pathname);
+    
+    // Use OAuth 2.0 endpoint
+    window.location.href = "http://localhost:4000/auth/twitter";
   };
 
   return (
-    <div className="max-w-md mx-auto mt-20 p-6 bg-gray-800 text-white rounded shadow">
-      <h2 className="text-2xl font-bold mb-4 text-center">
-        {isForgotPassword ? 'Forgot Password' : isSignUp ? 'Sign Up' : 'Login'}
-      </h2>
-      {error && <p className="text-red-500 text-center">{error}</p>}
-      {resetMessage && <p className="text-green-500 text-center">{resetMessage}</p>}
+    <div className="bg-white pt-24 md:pt-28 pb-20 min-h-screen">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8">
+        <div className="max-w-md mx-auto">
+          
+          {/* Page Header */}
+          <div className="border-b-2 border-black pb-6 mb-8 text-center">
+            <h1 className="text-4xl md:text-5xl font-bold text-black mb-2">
+              {isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Account' : 'Welcome Back'}
+            </h1>
+            <p className="text-gray-600">
+              {isForgotPassword 
+                ? 'Enter your details to reset your password' 
+                : isSignUp 
+                  ? 'Sign up to start shopping' 
+                  : 'Sign in to continue'}
+            </p>
+          </div>
 
-      {!isForgotPassword ? (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isSignUp && (
-            <>
-              <input
-                type="text"
-                placeholder="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-700 text-gray-300 rounded focus:outline-none"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Phone Number (+91)"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-700 text-gray-300 rounded focus:outline-none"
-                required
-                pattern="\+91[0-9]{10}" // Regex pattern for validation
-                title="Phone number must start with +91 followed by 10 digits"
-              />
-            </>
+          {/* Error/Success Messages */}
+          {error && (
+            <div className="border-2 border-red-500 bg-red-50 p-4 mb-6">
+              <p className="text-red-600 text-center">{error}</p>
+            </div>
           )}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-700 text-gray-300 rounded focus:outline-none"
-            required
-          />
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700 text-gray-300 rounded focus:outline-none pr-10"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-2 focus:outline-none"
-            >
-              {showPassword ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12c1.13 2.57 4.16 6 9 6s7.87-3.43 9-6-4.16-6-9-6-7.87 3.43-9 6z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12c0 1.6-1.34 3-3 3s-3-1.4-3-3 1.34-3 3-3 3 1.4 3 3z" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12c1.13-2.57 4.16-6 9-6s7.87 3.43 9 6-4.16 6-9 6-7.87-3.43-9-6z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12a3 3 0 00-3-3M12 12a3 3 0 003 3M12 12a3 3 0 003-3" />
-                </svg>
-              )}
-            </button>
-          </div>
-          <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded">
-            {isSignUp ? 'Sign Up' : 'Login'}
-          </button>
-          <div className="mt-6 text-center">
-            <p className="text-gray-400">Or login with</p>
+          {resetMessage && (
+            <div className="border-2 border-green-500 bg-green-50 p-4 mb-6">
+              <p className="text-green-600 text-center">{resetMessage}</p>
+            </div>
+          )}
 
-            {/* Google Login */}
-            <GoogleOAuthProvider
-              clientId={
-                import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-                "902643667030-1l6l00sgj4lp7k7voht4rep5rr7svdfu.apps.googleusercontent.com"
-              }
-            >
-              <GoogleLogin
-                onSuccess={(credentialResponse) => handleGoogleLoginSuccess(credentialResponse)}
-                onError={() => console.log("Google Login Failed")}
-              />
-            </GoogleOAuthProvider>
+          {/* Main Form */}
+          <div className="border-4 border-black bg-white p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            
+            {!isForgotPassword ? (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                
+                {/* Sign Up Fields */}
+                {isSignUp && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                        Full Name
+                      </label>
+                      <div className="relative">
+                        <FaUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="John Doe"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                          required
+                        />
+                      </div>
+                    </div>
 
-            {/* Facebook Login */}
-            <FacebookLogin
-              appId={import.meta.env.VITE_FACEBOOK_APP_ID}
-              onSuccess={(response) => handleFacebookLoginSuccess(response)}
-              onFail={(error) => console.error("Facebook Login Failed:", error)}
-              onProfileSuccess={(profile) => console.log("Facebook Profile:", profile)}
-              render={({ onClick }) => (
-                <button
-                  onClick={onClick}
-                  className="w-full flex items-center bg-blue-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-700 transition duration-300 mt-2"
-                >
-                  {/* Facebook Icon */}
-                  <div className="bg-white rounded-full p-1 mr-3">
-                    <FaFacebook className="text-blue-600 text-2xl" />
+                    <div>
+                      <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                        Phone Number
+                      </label>
+                      <div className="relative">
+                        <FaPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="+919876543210"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                          required
+                          pattern="\+91[0-9]{10}"
+                          title="Phone number must start with +91 followed by 10 digits"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Email Field */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                      required
+                    />
                   </div>
-                  {/* Centered Text */}
-                  <span className="flex-1 text-center font-semibold">
-                    Login with Facebook
-                  </span>
+                </div>
+
+                {/* Password Field */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <FaLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-12 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-black"
+                    >
+                      {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <button 
+                  type="submit" 
+                  className="w-full bg-black text-white py-4 text-lg font-medium hover:bg-gray-800 transition-colors border-2 border-black mt-6"
+                >
+                  {isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN'}
                 </button>
-              )}
-            />
 
-            {/* Twitter Login */}
-            <button
-              // onClick={(response) => handleTwitterLoginSuccess(response)}
-              onClick={() => (window.location.href = "http://localhost:4000/api/auth/twitter")}
-              className="w-full flex items-center bg-blue-500 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-600 transition duration-300 mt-2"
-            >
-              {/* Twitter Icon */}
-              <div className="bg-white rounded-full p-1 mr-3">
-                <FaTwitter className="text-blue-500 text-2xl" />
-              </div>
-              {/* Centered Text */}
-              <span className="flex-1 text-center font-semibold">
-                Login with Twitter
-              </span>
-            </button>
+                {/* Forgot Password Link */}
+                {!isSignUp && (
+                  <div className="text-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotPassword(true)}
+                      className="text-sm text-gray-600 hover:text-black border-b border-black pb-0.5"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                )}
+              </form>
+            ) : (
+              /* Forgot Password Form */
+              <form
+                onSubmit={step === 1 ? handleRequestOTP : step === 2 ? handleVerifyOTP : handleResetPassword}
+                className="space-y-5"
+              >
+                {step === 1 && (
+                  <>
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-3">
+                        OTP Delivery Method
+                      </label>
+                      <div className="flex items-center space-x-6">
+                        <label className="flex items-center gap-2 text-black">
+                          <input
+                            type="radio"
+                            name="otpMethod"
+                            value="email"
+                            checked={otpMethod === 'email'}
+                            onChange={() => setOtpMethod('email')}
+                            className="w-4 h-4"
+                          />
+                          <span>Email</span>
+                        </label>
+                        <label className="flex items-center gap-2 text-black">
+                          <input
+                            type="radio"
+                            name="otpMethod"
+                            value="phone"
+                            checked={otpMethod === 'phone'}
+                            onChange={() => setOtpMethod('phone')}
+                            className="w-4 h-4"
+                          />
+                          <span>Phone</span>
+                        </label>
+                      </div>
+                    </div>
 
-          </div>
-        </form>
-      ) : (
-        <form
-          onSubmit={step === 1 ? handleRequestOTP : step === 2 ? handleVerifyOTP : handleResetPassword}
-          className="space-y-4 bg-gray-800 p-6 rounded shadow-lg"
-        >
-          {step === 1 && (
-            <>
-              <div className="mb-4">
-                <label className="text-gray-300">Select OTP Delivery Method:</label>
-                <div className="flex items-center space-x-4">
-                  <label className="text-gray-300">
+                    {otpMethod === 'email' && (
+                      <div>
+                        <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="you@example.com"
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                          required
+                          className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                        />
+                      </div>
+                    )}
+                    
+                    {otpMethod === 'phone' && (
+                      <div>
+                        <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                          Phone Number
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="+919876543210"
+                          value={resetPhone}
+                          onChange={(e) => setResetPhone(e.target.value)}
+                          className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {step === 2 && (
+                  <div>
+                    <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                      Enter OTP
+                    </label>
                     <input
-                      type="radio"
-                      name="otpMethod"
-                      value="email"
-                      checked={otpMethod === 'email'}
-                      onChange={() => setOtpMethod('email')}
-                      className="mr-2"
+                      type="text"
+                      placeholder="123456"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      required
+                      className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
                     />
-                    Email
-                  </label>
-                  <label className="text-gray-300">
+                  </div>
+                )}
+                
+                {step === 3 && (
+                  <div>
+                    <label className="block text-sm font-bold text-gray-600 uppercase tracking-wider mb-2">
+                      New Password
+                    </label>
                     <input
-                      type="radio"
-                      name="otpMethod"
-                      value="phone"
-                      checked={otpMethod === 'phone'}
-                      onChange={() => setOtpMethod('phone')}
-                      className="mr-2"
+                      type="password"
+                      placeholder="••••••••"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
                     />
-                    Phone
-                  </label>
+                  </div>
+                )}
+                
+                <button
+                  type="submit"
+                  className="w-full bg-black text-white py-4 text-lg font-medium hover:bg-gray-800 transition-colors border-2 border-black mt-6"
+                >
+                  {step === 1 ? 'SEND OTP' : step === 2 ? 'VERIFY OTP' : 'RESET PASSWORD'}
+                </button>
+
+                <div className="text-center mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPassword(false)}
+                    className="text-sm text-gray-600 hover:text-black border-b border-black pb-0.5"
+                  >
+                    Back to Login
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Divider */}
+            {!isForgotPassword && (
+              <div className="relative my-8">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t-2 border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-white text-gray-500">OR</span>
                 </div>
               </div>
-
-              {otpMethod === 'email' && (
-                <input
-                  type="email"
-                  placeholder="Enter Email"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 bg-gray-700 text-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              )}
-              {otpMethod === 'phone' && (
-                <input
-                  type="text"
-                  placeholder="Enter Phone Number (+91)"
-                  value={resetPhone}
-                  onChange={(e) => setResetPhone(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-700 text-gray-300 rounded focus:outline-none"
-                />
-              )}
-            </>
-          )}
-          {step === 2 && (
-            <input
-              type="text"
-              placeholder="Enter OTP"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              required
-              className="w-full px-4 py-2 bg-gray-700 text-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          )}
-          {step === 3 && (
-            <input
-              type="password"
-              placeholder="New Password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              className="w-full px-4 py-2 bg-gray-700 text-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          )}
-          <button
-            type="submit"
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded transition duration-300"
-          >
-            {step === 1 ? 'Send OTP' : step === 2 ? 'Verify OTP' : 'Reset Password'}
-          </button>
-        </form>
-      )}
-      <p className="text-center mt-4">
-        {!isForgotPassword ? (
-          <>
-            {isSignUp ? (
-              <span>
-                Already have an account?{' '}
-                <button onClick={() => setIsSignUp(false)} className="text-indigo-400 hover:underline">
-                  Sign in
-                </button>
-              </span>
-            ) : (
-              <span>
-                Don't have an account?{' '}
-                <button onClick={() => setIsSignUp(true)} className="text-indigo-400 hover:underline">
-                  Sign up
-                </button>
-              </span>
             )}
-            <br />
-            <button onClick={() => setIsForgotPassword(true)} className="text-indigo-400 hover:underline mt-2">
-              Forgot Password?
-            </button>
-          </>
-        ) : (
-          <button onClick={() => setIsForgotPassword(false)} className="text-indigo-400 hover:underline">
-            Back to Login
-          </button>
-        )}
-      </p>
-      {/* Display user ID or guest message */}
-      <p className="text-center mt-4">
-        {userId ? `User ID: ${userId}` : 'You are currently signed in as a guest.'}
-      </p>
+
+            {/* Social Login */}
+            {!isForgotPassword && (
+              <div className="space-y-3">
+                <p className="text-sm text-center text-gray-600 mb-4">Continue with</p>
+                
+                {/* Google Login */}
+                <GoogleOAuthProvider
+                  clientId="902643667030-1l6l00sgj4lp7k7voht4rep5rr7svdfu.apps.googleusercontent.com"
+                >
+                  <div className="border-2 border-black hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
+                    <GoogleLogin
+                      onSuccess={handleGoogleLoginSuccess}
+                      onError={() => console.log("Google Login Failed")}
+                      theme="filled_black"
+                      shape="rectangular"
+                      size="large"
+                      width="100%"
+                      text="continue_with"
+                    />
+                  </div>
+                </GoogleOAuthProvider>
+
+                {/* Facebook Login */}
+                <FacebookLogin
+                  appId={import.meta.env.VITE_FACEBOOK_APP_ID}
+                  onSuccess={handleFacebookLoginSuccess}
+                  onFail={(error) => console.error("Facebook Login Failed:", error)}
+                  fields="name,email,picture"
+                  scope="public_profile,email"
+                  redirectUri={window.location.origin}
+                  render={({ onClick }) => (
+                    <button
+                      onClick={onClick}
+                      className="w-full flex items-center border-2 border-black bg-white hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all px-4 py-3"
+                    >
+                      <FaFacebook className="text-blue-600 text-2xl mr-3" />
+                      <span className="flex-1 text-center font-medium text-black">
+                        Continue with Facebook
+                      </span>
+                    </button>
+                  )}
+                />
+
+                {/* Twitter Login */}
+                <button
+                  onClick={handleTwitterLogin}
+                  className="w-full flex items-center border-2 border-black bg-white hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all px-4 py-3"
+                >
+                  <FaTwitter className="text-blue-400 text-2xl mr-3" />
+                  <span className="flex-1 text-center font-medium text-black">
+                    Continue with Twitter
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Toggle Sign Up/In */}
+            {!isForgotPassword && (
+              <div className="text-center mt-6 pt-6 border-t-2 border-gray-200">
+                <p className="text-gray-600">
+                  {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+                  <button
+                    onClick={() => setIsSignUp(!isSignUp)}
+                    className="font-bold text-black border-b-2 border-black hover:text-gray-600 hover:border-gray-600 transition-colors"
+                  >
+                    {isSignUp ? 'Sign In' : 'Create Account'}
+                  </button>
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Guest Status */}
+          <p className="text-center text-sm text-gray-500 mt-6">
+            {userId ? `Logged in as user: ${userId}` : 'You are browsing as a guest.'}
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
