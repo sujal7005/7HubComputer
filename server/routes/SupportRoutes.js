@@ -6,8 +6,8 @@ const router = Router();
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: "sujal0705gupta@gmail.com",  // Your email address
-      pass: "nwtvkzxoidwxpaqu",  // Your email password
+      user: your-email-address,  // Your email address
+      pass: your-email-password,  // Your email password
     },
 });
 
