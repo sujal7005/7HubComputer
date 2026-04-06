@@ -18,18 +18,18 @@ const Home = () => {
   // Enhanced HD Images with detailed text overlay content
   const heroImages = [
     {
-      url: "https://images.unsplash.com/photo-1603484477859-abe6a73f9366?q=80&w=2070&auto=format&fit=crop",
+      url: "https://www.jagatreview.com/wp-content/uploads/2023/01/Ada_Lovelace_laptop_header-720x378.jpg",
       alt: "Premium Gaming Laptop with RGB Keyboard",
       title: "Gaming Laptops",
       subtitle: "RTX 40 Series",
       description: "Experience next-gen gaming with ray tracing and AI-powered performance.",
-      price: "Starting ₹89,999",
+      price: "Starting ₹40,999",
       badge: "NEW",
       cta: "SHOP GAMING LAPTOPS",
       link: "/laptops"
     },
     {
-      url: "https://images.unsplash.com/photo-1587831990711-23ca6441447b?q=80&w=2071&auto=format&fit=crop",
+      url: "",
       alt: "Custom RGB Gaming PC Setup",
       title: "Gaming Desktops",
       subtitle: "RGB Custom Builds",
@@ -40,7 +40,7 @@ const Home = () => {
       link: "/prebuilt"
     },
     {
-      url: "https://images.unsplash.com/photo-1593642702821-c8da6771f0c6?q=80&w=2070&auto=format&fit=crop",
+      url: "https://scribejoy.com/wp-content/uploads/emplibot/HIPAA-Compliant-Email_-Essential-Security-Requirements_1745284224.jpeg",
       alt: "Compact Mini PC",
       title: "Mini PCs",
       subtitle: "Space-Saving Power",
@@ -51,7 +51,7 @@ const Home = () => {
       link: "/mini-pcs"
     },
     {
-      url: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=2071&auto=format&fit=crop",
+      url: "",
       alt: "Accessible with Assistive Technology",
       title: "Accessibility",
       subtitle: "Accessible Power",
@@ -62,12 +62,12 @@ const Home = () => {
       link: "/accessibility"
     },
     {
-      url: "https://images.unsplash.com/photo-1624705002806-5d72df19c3ad?q=80&w=2070&auto=format&fit=crop",
+      url: "https://www.hks.net.au/cdn/shop/files/DALL_E2024-04-1021.57.00-Acustom-builthigh-endgamingdesktopPCinamodernsetting.ThePCfeaturesatransparentsidepanelshowcasingitsinternalcomponents_likeanRG.webp?v=1712751986",
       alt: "Custom Water Cooled PC",
       title: "Custom Builds",
       subtitle: "Liquid Cooling",
       description: "Design your dream PC with custom water cooling and premium components.",
-      price: "Starting ₹1,99,999",
+      price: "Starting ₹1,00,000",
       badge: "CUSTOM",
       cta: "START BUILDING",
       link: "/custom"
@@ -385,22 +385,6 @@ const Home = () => {
             />
           ))}
         </div>
-
-        {/* Play/Pause Button */}
-        <button
-          onClick={resetAutoPlay}
-          className="absolute top-8 right-8 bg-white/90 hover:bg-white p-2 md:p-3 rounded-full shadow-lg border-2 border-black z-20"
-        >
-          {isAutoPlaying ? (
-            <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="black" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6" />
-            </svg>
-          ) : (
-            <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="black" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-            </svg>
-          )}
-        </button>
         
       </section>
 
