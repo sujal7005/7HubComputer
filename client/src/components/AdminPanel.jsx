@@ -503,9 +503,10 @@ const AdminPanel = () => {
     const socketConnection = io(`${BASE_URL}`, {
       transports: ["polling", "websocket"],
       withCredentials: true,
-      // extraHeaders: {
-      //   "Access-Control-Allow-Origin": ["http://localhost:5173", "http://172.17.0.1:5173/"]
-      // }
+      extraHeaders: {
+        // "Access-Control-Allow-Origin": ["http://localhost:5173", "http://172.17.0.1:5173/"]
+        "Access-Control-Allow-Origin": []
+      }
     });
 
     setSocket(socketConnection);

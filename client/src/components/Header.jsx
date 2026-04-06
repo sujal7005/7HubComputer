@@ -20,6 +20,8 @@ const Header = () => {
   const [loading, setLoading] = useState(false);
   const searchInputRef = useRef(null);
   const searchContainerRef = useRef(null);
+  const accountMenuRef = useRef(null);
+  const accountButtonRef = useRef(null);
   const navigate = useNavigate();
   const BASE_URL = `http://${window.location.hostname}:4000`;
 
@@ -48,6 +50,24 @@ const Header = () => {
         setSuggestions([]);
       }
     };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Close account menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside both the button and the menu
+      if (
+        accountMenuRef.current && 
+        !accountMenuRef.current.contains(event.target) &&
+        accountButtonRef.current &&
+        !accountButtonRef.current.contains(event.target)
+      ) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+    
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -280,10 +300,6 @@ const Header = () => {
     navigate('/');
   };
 
-  const closeNotification = () => {
-    setShowNotification(false);
-  };
-
   return (
     <>
       {/* 🔥 HIGHLIGHTED NOTIFICATION BAR - Full Width Solid Red with Left to Right Animation */}
@@ -320,15 +336,6 @@ const Header = () => {
                   </span>
                 </div>
               </div>
-              
-              {/* Right side - Close button */}
-              <button 
-                onClick={closeNotification}
-                className="text-white/90 hover:text-white transition-colors flex-shrink-0 pr-4 z-10"
-                aria-label="Close notification"
-              >
-                <FaTimes size={18} />
-              </button>
             </div>
           </div>
         </div>
@@ -469,28 +476,43 @@ const Header = () => {
                 <FaSearch size={22} />
               </button>
 
-              {/* Account */}
+              {/* Account Menu */}
               <div className="relative">
                 <button 
+                  ref={accountButtonRef}
                   onClick={toggleAccountMenu} 
                   className="text-gray-700 hover:text-orange-600 transition-colors"
                 >
                   <FaUserCircle size={26} />
                 </button>
                 {isAccountMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-40 bg-white/95 backdrop-blur-md border-2 border-black shadow-xl rounded-md z-50">
+                  <div 
+                    ref={accountMenuRef}
+                    className="absolute right-0 mt-2 w-40 bg-white/95 backdrop-blur-md border-2 border-black shadow-xl rounded-md z-50"
+                  >
                     {isLoggedIn ? (
                       <>
-                        <Link to="/profile" className="block px-4 py-2 text-sm hover:bg-orange-50 hover:text-orange-600 transition-colors">
+                        <Link 
+                          to="/profile" 
+                          className="block px-4 py-2 text-sm hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                          onClick={() => setIsAccountMenuOpen(false)}
+                        >
                           Profile
                         </Link>
-                        <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm hover:bg-orange-50 hover:text-orange-600 transition-colors border-t border-gray-200">
+                        <button 
+                          onClick={handleSignOut} 
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-orange-50 hover:text-orange-600 transition-colors border-t border-gray-200"
+                        >
                           Sign Out
                         </button>
                       </>
                     ) : (
                       <>
-                        <Link to="/signin" className="block px-4 py-2 text-sm hover:bg-orange-50 hover:text-orange-600 transition-colors">
+                        <Link 
+                          to="/signin" 
+                          className="block px-4 py-2 text-sm hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                          onClick={() => setIsAccountMenuOpen(false)}
+                        >
                           Sign In
                         </Link>
                       </>

@@ -44,14 +44,15 @@ const App = () => {
   const location = useLocation();
   const nodeRef = useRef(null);
 
-  const isAdminRoute = location.pathname === '/admin';
+  const hideLayoutRoutes = ['/admin', '/signin', '/login'];
+  const isHiddenRoute = hideLayoutRoutes.includes(location.pathname);
 
   return (
     <HelmetProvider>
       <div className="min-h-screen bg-gray-100 text-gray-800">
-        {!isAdminRoute && <Header />}
+        {!isHiddenRoute && <Header />}
         <Cookies />
-        <main className="mx-auto py-8 px-4 mt-20">
+        <main className="mx-auto py-8 px-4">
           <div ref={nodeRef}>
             <PageTransition in={true} nodeRef={nodeRef}>
               <Suspense fallback={
@@ -97,7 +98,7 @@ const App = () => {
             </PageTransition>
           </div>
         </main>
-        {!isAdminRoute && <Footer />}
+        {!isHiddenRoute && <Footer />}
       </div>
     </HelmetProvider>
   );
