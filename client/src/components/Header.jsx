@@ -286,47 +286,45 @@ const Header = () => {
 
   return (
     <>
-      {/* 🔥 HIGHLIGHTED NOTIFICATION BAR - Full Width Solid Red */}
+      {/* 🔥 HIGHLIGHTED NOTIFICATION BAR - Full Width Solid Red with Left to Right Animation */}
       {showNotification && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-red-600 to-red-500 text-white overflow-hidden">
           <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-10">
               
-              {/* Left side - Fire Icon with NO extra spacing */}
+              {/* Left side - Fire Icon */}
               <div className="flex items-center flex-shrink-0 pl-4">
                 <FaFire className="text-white text-xl animate-pulse" />
               </div>
                 
-                {/* Scrolling Text Container - full width */}
-                <div className="overflow-hidden flex-1 mx-0">
-                  <div className="flex items-center space-x-8 animate-scroll">
-                    <span className="text-sm font-bold uppercase tracking-wider whitespace-nowrap flex items-center gap-2">
-                      <FaGift className="text-white" /> SUMMER SALE - 40% OFF
-                    </span>
-                    <span className="text-sm font-bold uppercase tracking-wider whitespace-nowrap flex items-center gap-2">
-                      <FaPercent className="text-white" /> GAMING PCs UP TO 40% OFF
-                    </span>
-                    <span className="text-sm font-bold uppercase tracking-wider whitespace-nowrap flex items-center gap-2">
-                      <FaFire className="text-white" /> FREE SHIPPING ON ALL ORDERS
-                    </span>
-                    <span className="text-sm font-bold uppercase tracking-wider whitespace-nowrap flex items-center gap-2">
-                      <FaGift className="text-white" /> EXTRA 10% OFF FIRST PURCHASE
-                    </span>
-                    {/* Duplicate content for seamless looping */}
-                    <span className="text-sm font-bold uppercase tracking-wider whitespace-nowrap flex items-center gap-2">
-                      <FaGift className="text-white" /> SUMMER SALE - 40% OFF
-                    </span>
-                    <span className="text-sm font-bold uppercase tracking-wider whitespace-nowrap flex items-center gap-2">
-                      <FaPercent className="text-white" /> GAMING PCs UP TO 40% OFF
-                    </span>
-                  </div>
+              {/* Scrolling Text Container - Left to Right Animation */}
+              <div className="overflow-hidden flex-1 mx-0 relative">
+                <div className="whitespace-nowrap animate-scroll-left">
+                  <span className="text-sm font-bold uppercase tracking-wider mx-8 flex items-center gap-2 inline-flex">
+                    <FaGift className="text-white" /> SUMMER SALE - 40% OFF
+                  </span>
+                  <span className="text-sm font-bold uppercase tracking-wider mx-8 flex items-center gap-2 inline-flex">
+                    <FaPercent className="text-white" /> GAMING PCs UP TO 40% OFF
+                  </span>
+                  <span className="text-sm font-bold uppercase tracking-wider mx-8 flex items-center gap-2 inline-flex">
+                    <FaFire className="text-white" /> FREE SHIPPING ON ALL ORDERS
+                  </span>
+                  <span className="text-sm font-bold uppercase tracking-wider mx-8 flex items-center gap-2 inline-flex">
+                    <FaGift className="text-white" /> EXTRA 10% OFF FIRST PURCHASE
+                  </span>
+                  <span className="text-sm font-bold uppercase tracking-wider mx-8 flex items-center gap-2 inline-flex">
+                    <FaGift className="text-white" /> LIMITED TIME OFFER - SHOP NOW
+                  </span>
+                  <span className="text-sm font-bold uppercase tracking-wider mx-8 flex items-center gap-2 inline-flex">
+                    <FaPercent className="text-white" /> UP TO 50% OFF ON SELECTED ITEMS
+                  </span>
                 </div>
+              </div>
               
-
-              {/* Right side - Close button only */}
+              {/* Right side - Close button */}
               <button 
                 onClick={closeNotification}
-                className="text-white/90 hover:text-white transition-colors flex-shrink-0 pr-4"
+                className="text-white/90 hover:text-white transition-colors flex-shrink-0 pr-4 z-10"
                 aria-label="Close notification"
               >
                 <FaTimes size={18} />
@@ -378,7 +376,7 @@ const Header = () => {
               <p className="text-[8px] md:text-[10px] uppercase tracking-widest text-gray-500/80 -mt-1">Since 2020</p>
             </Link>
 
-            {/* Desktop Navigation - Center with less space */}
+            {/* Desktop Navigation - Center */}
             <nav className="hidden md:flex items-center space-x-6 lg:space-x-8">
               {[
                 { name: 'Home', path: '/' },
@@ -404,7 +402,7 @@ const Header = () => {
               ))}
             </nav>
 
-            {/* Right Icons - Larger Icons */}
+            {/* Right Icons */}
             <div className="flex items-center space-x-4 md:space-x-5">
               
               {/* Desktop Search - Icon that opens input */}
@@ -463,7 +461,7 @@ const Header = () => {
                 )}
               </div>
 
-              {/* Mobile Search Icon - Larger */}
+              {/* Mobile Search Icon */}
               <button 
                 onClick={toggleSearch}
                 className="md:hidden text-gray-700 hover:text-orange-600 transition-colors"
@@ -471,7 +469,7 @@ const Header = () => {
                 <FaSearch size={22} />
               </button>
 
-              {/* Account - Larger Icon */}
+              {/* Account */}
               <div className="relative">
                 <button 
                   onClick={toggleAccountMenu} 
@@ -501,7 +499,7 @@ const Header = () => {
                 )}
               </div>
 
-              {/* Cart - Larger Icon */}
+              {/* Cart */}
               <Link to="/cart" className="relative group">
                 <FaShoppingCart className="text-gray-700 group-hover:text-orange-600 transition-colors" size={24} />
                 {cartItems.length > 0 && (
@@ -511,7 +509,7 @@ const Header = () => {
                 )}
               </Link>
 
-              {/* Mobile Menu Button - Larger Icon */}
+              {/* Mobile Menu Button */}
               <button
                 className="md:hidden text-gray-700 hover:text-orange-600 focus:outline-none transition-colors"
                 onClick={toggleMenu}
@@ -605,6 +603,27 @@ const Header = () => {
           </nav>
         )}
       </header>
+
+      {/* Add CSS for left-to-right scrolling animation */}
+      <style jsx>{`
+        @keyframes scrollLeft {
+          0% {
+            transform: translateX(100%);
+          }
+          100% {
+            transform: translateX(-100%);
+          }
+        }
+        
+        .animate-scroll-left {
+          animation: scrollLeft 25s linear infinite;
+          display: inline-block;
+        }
+        
+        .animate-scroll-left:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
     </>
   );
 };
