@@ -45,7 +45,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },  // Set max file size to 10MB
   fileFilter,
 }).fields([
-  { name: 'image', maxCount: 15 }, // Main product images
+  { name: 'image', maxCount: 10 }, // Main product images
   { name: 'additionalImages', maxCount: 20 } // Additional gallery images
 ]);
 

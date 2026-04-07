@@ -36,8 +36,26 @@ const Accessibility = () => {
     fetchAccessories();
   }, []);
 
+  const BASE_URL = `http://${window.location.hostname}:4000`;
+
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return "/placeholder.png";
+
+    // Already full URL (Cloudinary, CDN, etc.)
+    if (imagePath.startsWith("http")) {
+      return imagePath;
+    }
+
+    // If path starts with /
+    if (imagePath.startsWith("/")) {
+      return `${BASE_URL}${imagePath}`;
+    }
+
+    // If only filename
+    return `${BASE_URL}/uploads/${imagePath}`;
+  };
+
   const fetchAccessories = async () => {
-    const BASE_URL = `http://${window.location.hostname}:4000`;
     try {
       setLoading(true);
       const response = await fetch(`${BASE_URL}/api/accessories`);
@@ -318,7 +336,7 @@ const Accessibility = () => {
                 <div className="relative border-b-2 border-black overflow-hidden bg-gray-50">
                   <div className="aspect-square flex items-center justify-center p-6">
                     <img
-                      src={item.images?.[0] || item.image || 'https://via.placeholder.com/400x400?text=No+Image'}
+                      src={getImageUrl(item.images?.[0] || item.image)}
                       alt={item.name}
                       className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
                     />

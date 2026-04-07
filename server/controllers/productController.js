@@ -153,20 +153,19 @@ const parseOptions = (key, options) => {
 };
 
 export const createProducts = async (req, res) => {
-  console.log("Request body:", req.body);  // Logs form fields like customId, name, etc.
+  console.log("Request body:", req.body);
+  console.log("Request files:", req.files);
 
   const {
     id, name, price, category, description, popularity, type, otherTechnicalDetails, notes,
     originalPrice, brand, stock, code, condition, discount, bonuses, dateAdded, customId,
     keyFeatures, specifications, additionalImages, videos,
-    // Pre-Built PC-specific fields
     platform, cpu, motherboard, ramOptions, storage1Options, storage2Options,
     liquidcooler, graphiccard, smps, cabinet,
-    // Refurbished Laptop-specific fields
     os, display, storage, ram,
   } = req.body;
 
-    // Parse otherTechnicalDetails if they are strings resembling JSON
+  // Parse otherTechnicalDetails
   let parsedOtherTechnicalDetails = [];
   if (otherTechnicalDetails) {
     if (typeof otherTechnicalDetails === 'string') {
@@ -185,17 +184,14 @@ export const createProducts = async (req, res) => {
   if (keyFeatures) {
     if (typeof keyFeatures === 'string') {
       try {
-        // Try to parse as JSON
         parsedKeyFeatures = JSON.parse(keyFeatures);
         console.log("Parsed keyFeatures from string:", parsedKeyFeatures);
       } catch (err) {
         console.error("Error parsing keyFeatures string:", err);
-        // If it's not valid JSON, maybe it's a single string
         parsedKeyFeatures = [{ title: keyFeatures, description: "" }];
       }
     } else if (Array.isArray(keyFeatures)) {
       parsedKeyFeatures = keyFeatures;
-      console.log("keyFeatures is already an array:", parsedKeyFeatures);
     }
   }
   
@@ -212,7 +208,6 @@ export const createProducts = async (req, res) => {
       }
     } else if (Array.isArray(specifications)) {
       parsedSpecifications = specifications;
-      console.log("specifications is already an array:", parsedSpecifications);
     }
   }
   
@@ -232,11 +227,66 @@ export const createProducts = async (req, res) => {
     }
   }
 
-  const validatedRamOptions = parseOptions('ramOptions', ramOptions);
-  const validatedStorage1Options = parseOptions('storage1Options', storage1Options);
-  const validatedStorage2Options = parseOptions('storage2Options', storage2Options);
+  // Parse options for RAM and Storage
+  const parseOptions = (options) => {
+    if (typeof options !== 'object' || options === null) return [];
+    const parsedOptions = [];
+    for (const [index, value] of Object.entries(options)) {
+      if (index === '' || !value) continue;
+      try {
+        const parsedValue = JSON.parse(value);
+        if (parsedValue.value && parsedValue.price) {
+          parsedOptions.push(parsedValue);
+        }
+      } catch (err) {
+        console.error(`Error parsing option:`, err);
+      }
+    }
+    return parsedOptions;
+  };
 
-  if (!req.files || req.files.length === 0) {
+  const validatedRamOptions = parseOptions(ramOptions);
+  const validatedStorage1Options = parseOptions(storage1Options);
+  const validatedStorage2Options = parseOptions(storage2Options);
+
+  // Handle files - FIX: req.files is an object with field names as keys
+  let mainImageUrls = [];
+  let additionalImageUrls = [];
+
+  if (req.files) {
+    // Handle case where files are uploaded with field names
+    if (req.files.image) {
+      // If image is an array
+      if (Array.isArray(req.files.image)) {
+        mainImageUrls = req.files.image.map(file => file.path);
+      } else {
+        mainImageUrls = [req.files.image.path];
+      }
+    }
+    
+    if (req.files.additionalImages) {
+      if (Array.isArray(req.files.additionalImages)) {
+        additionalImageUrls = req.files.additionalImages.map(file => file.path);
+      } else {
+        additionalImageUrls = [req.files.additionalImages.path];
+      }
+    }
+  }
+
+  // Also handle case where files might be in req.files as array (old format)
+  if (Array.isArray(req.files) && req.files.length > 0) {
+    const mainFiles = req.files.filter(file => file.fieldname === 'image');
+    const additionalFiles = req.files.filter(file => file.fieldname === 'additionalImages');
+    
+    if (mainFiles.length > 0) {
+      mainImageUrls = mainFiles.map(file => file.path);
+    }
+    if (additionalFiles.length > 0) {
+      additionalImageUrls = additionalFiles.map(file => file.path);
+    }
+  }
+
+  if (mainImageUrls.length === 0) {
     return res.status(400).json({ message: 'No valid images or image data provided' });
   }
 
@@ -244,14 +294,14 @@ export const createProducts = async (req, res) => {
     ? id
     : customId && customId.trim() !== ""
       ? customId
-      : uuidv4(); // Generate a new UUID if both id and customId are missing
+      : uuidv4();
 
   if (!productId || productId.trim() === null) {
     console.error("Product ID (or customId) is missing!");
     return res.status(400).json({ message: 'Product ID (or customId) is required' });
   }
 
-  // Check if a product with the same productId already exists
+  // Check if product already exists
   try {
     const existingProduct = await RefurbishedLaptop.findOne({ productId });
     if (existingProduct) {
@@ -263,26 +313,16 @@ export const createProducts = async (req, res) => {
     return res.status(500).json({ message: "Error checking product uniqueness" });
   }
 
-  // Separate main images from additional images
-  // In the request, main images are sent as 'image' field, additional as 'additionalImages'
-  const mainImageFiles = req.files.filter(file => file.fieldname === 'image');
-  const additionalImageFiles = req.files.filter(file => file.fieldname === 'additionalImages');
-
-  const mainImageUrls = mainImageFiles.map((file) => file.path);
-  const additionalImageUrls = additionalImageFiles.map((file) => file.path);
-
   console.log("Product ID is unique, proceeding to save the product.");
 
-  // Validate uploaded files
-  if (mainImageUrls.length === 0) {
-    return res.status(400).json({ message: "No valid images or image data provided" });
-  }
-
-  // Include specs in your product data
+  // Build product data
   const productDataWithImages = {
     id, productId, name, price, category, description, popularity, type,
-    otherTechnicalDetails: req.body.otherTechnicalDetails, notes, originalPrice, brand,
-    stock, code, condition, discount, bonuses, dateAdded, customId, 
+    otherTechnicalDetails: parsedOtherTechnicalDetails,
+    notes: notes ? (typeof notes === 'string' ? JSON.parse(notes) : notes) : [],
+    originalPrice, brand,
+    stock: stock === "true" || stock === true,
+    code, condition, discount, bonuses, dateAdded, customId, 
     image: mainImageUrls,
     additionalImages: additionalImageUrls,
     keyFeatures: parsedKeyFeatures,
@@ -290,6 +330,7 @@ export const createProducts = async (req, res) => {
     videos: parsedVideos,
   };
 
+  // Add specs based on product type
   if (type === "Pre-Built PC") {
     productDataWithImages.specs = {
       platform: platform || "",
@@ -327,17 +368,11 @@ export const createProducts = async (req, res) => {
     return res.status(400).json({ message: "Invalid product type" });
   }
 
-  console.log("Product Data to Save:", productDataWithImages);
-
-  // Verify that the productId is not null or undefined before creating the new product
-  if (!productDataWithImages.id || productDataWithImages.id.trim() === "") {
-    return res.status(400).json({ message: "ID is required and cannot be empty" });
-  }
+  console.log("Product Data to Save:", JSON.stringify(productDataWithImages, null, 2));
 
   try {
     let newProduct;
 
-    // Check productType and create the appropriate product
     if (type === 'Pre-Built PC') {
       newProduct = new PreBuildPC(productDataWithImages);
     } else if (type === 'Refurbished Laptop') {
@@ -350,7 +385,6 @@ export const createProducts = async (req, res) => {
       return res.status(400).json({ message: 'Invalid product type' });
     }
 
-    // Return the created product
     await newProduct.save();
     res.status(201).json({ newProduct });
   } catch (error) {

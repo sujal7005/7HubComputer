@@ -363,7 +363,9 @@ const Header = () => {
                 </span>
               </span>
               <div className="flex items-center space-x-6">
-                <span className="hidden md:inline hover:text-black cursor-pointer transition-colors">Store Locator</span>
+                <Link to="/store-location" className="hidden md:inline hover:text-black cursor-pointer transition-colors">
+                  Store Locator
+                </Link>
                 <span className="hidden md:inline hover:text-black cursor-pointer transition-colors">Track Order</span>
                 <span className="hover:text-black cursor-pointer transition-colors">24/7 Support</span>
               </div>
@@ -605,6 +607,7 @@ const Header = () => {
               { name: 'Pre-Built PCs', path: '/prebuilt' },
               { name: 'Laptops', path: '/laptops' },
               { name: 'Mini PCs', path: '/mini-pcs' },
+              { name: 'Store Location', path: '/store-location' },
               { name: 'About', path: '/about' },
               { name: 'Custom PC', path: '/custom' },
               { name: 'Contact', path: '/contact' },

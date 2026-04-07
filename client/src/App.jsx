@@ -28,6 +28,7 @@ const MiniPC = lazy(() => import('./pages/MiniPCs'));
 const AllInOnePCs = lazy(() => import('./pages/AllInOnePCs'));
 const Accessibility = lazy(() => import('./pages/Accessibility.jsx'))
 const Display = lazy(() => import('./pages/Display.jsx'));
+const StoreLocator = lazy(() => import('./pages/StoreLocation.jsx'));
 const DisplayDetails = lazy(() => import('./components/DisplayDetails.jsx'));
 const Payment = lazy(() => import('./components/Payment'));
 const PaymentSuccess = lazy(() => import('./components/PaymentSuccess.jsx'));
@@ -93,6 +94,7 @@ const App = () => {
                   <Route path='/accessibility' element={<Accessibility />} />
                   <Route path='/display' element={<Display />} />
                   <Route path='/display/:id' element={<DisplayDetails />} />
+                  <Route path='/store-location' element={<StoreLocator />} />
                 </Routes>
               </Suspense>
             </PageTransition>

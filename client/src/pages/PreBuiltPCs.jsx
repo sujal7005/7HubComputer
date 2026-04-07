@@ -33,11 +33,23 @@ const PreBuiltPCs = () => {
 
   // Helper function to get image URL
   const getImageUrl = (imagePath) => {
-    if (!imagePath) return '';
+    if (!imagePath) return "";
+    
+    // Case 1: Already full URL
+    if (imagePath.startsWith("http")) {
+      return imagePath;
+    }
+  
+    // Case 2: Already contains uploads path
+    if (imagePath.startsWith("uploads")) {
+      return `http://localhost:4000/${imagePath}`;
+    }
+  
+    // Case 3: Only filename
     const filename = imagePath.split(/[\\/]/).pop();
     return `http://localhost:4000/uploads/${filename}`;
   };
-
+  
   // Filter and sort products
   const filteredPCs = Array.isArray(pcs)
     ? pcs
@@ -202,7 +214,7 @@ const PreBuiltPCs = () => {
                       <div className="aspect-square flex items-center justify-center p-6">
                         <img
                           className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
-                          src={getImageUrl(pc.image[0])}
+                          src={getImageUrl(pc?.image?.[0])}
                           alt={pc.name}
                         />
                       </div>

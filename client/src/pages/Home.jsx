@@ -117,6 +117,27 @@ const Home = () => {
     navigate('/cart')
   };
 
+  const getProductLink = (product) => {
+    if (!product) return "/";
+
+    switch (product.type) {
+      case "Refurbished Laptop":
+        return `/refurbished/${product._id}`;
+
+      case "Mini PC":
+        return `/mini-pcs/${product._id}`;
+
+      case "PreBuilt PC":
+        return `/pc/${product._id}`;
+
+      case "Accessory":
+        return `/accessories/${product._id}`;
+
+      default:
+        return `/product/${product._id}`; // fallback
+    }
+  };
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -334,10 +355,15 @@ const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {products.slice(0, 4).map((product, index) => (
               <div key={index} className="group bg-white border-2 border-black hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
-                <Link to={`/product/${product._id}`} className='block relative border-b-2 border-black overflow-hidden bg-gray-50'>
+                <Link to={getProductLink(product)} className='block relative border-b-2 border-black overflow-hidden bg-gray-50'>
                   <div className="aspect-square flex items-center justify-center p-6">
                     <img
-                      src={`http://localhost:4000/uploads/${product.image[0].split(/[\\/]/).pop()}`}
+                      src={ product.image?.[0]?.startsWith("http")
+                            ? product.image[0] // already full URL
+                            : product.image?.[0]?.startsWith("uploads")
+                            ? `http://localhost:4000/${product.image[0]}` // relative uploads path
+                            : `http://localhost:4000/uploads/${product.image?.[0]?.split(/[\\/]/).pop()}` // filename only
+                          }
                       alt={product.name}
                       className="w-full h-full object-contain"
                     />
@@ -347,7 +373,7 @@ const Home = () => {
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
                     {product.brand || product.type || "7HUBCOMPUTERS"}
                   </p>
-                  <Link to={`/product/${product._id}`} className="block group">
+                  <Link to={getProductLink(product)} className="block group">
                     <h3 className="text-xl font-bold text-black mb-2 hover:underline">
                       {product.name}
                     </h3>
@@ -395,13 +421,13 @@ const Home = () => {
         </div>
       </section>
           
-      {/* REFURBISHED LAPTOPS SECTION */}
+      {/* LAPTOPS SECTION */}
       <section className="border border-black mx-4 md:mx-6 lg:mx-8 my-4 md:my-6">
         <div className="container mx-auto px-6 md:px-10 py-16 md:py-20">
           <div className="flex justify-between items-end mb-16">
             <div>
               <h2 className="text-4xl md:text-5xl font-bold text-black tracking-tight mb-2">
-                Refurbished Laptops
+                Laptops
               </h2>
               <p className="text-sm text-gray-500 uppercase tracking-wider">
                 Quality tested • 1 year warranty
@@ -424,7 +450,12 @@ const Home = () => {
                   <Link to={`/refurbished/${laptop._id}`} className='block relative border-b-2 border-black overflow-hidden bg-gray-50'>
                     <div className="aspect-square flex items-center justify-center p-6">
                       <img
-                        src={`http://localhost:4000/uploads/${laptop.image[0].split(/[\\/]/).pop()}`}
+                        src={ laptop.image?.[0]?.startsWith("http")
+                            ? laptop.image[0] // already full URL
+                            : laptop.image?.[0]?.startsWith("uploads")
+                            ? `http://localhost:4000/${laptop.image[0]}` // relative uploads path
+                            : `http://localhost:4000/uploads/${laptop.image?.[0]?.split(/[\\/]/).pop()}` // filename only
+                          }
                         alt={laptop.name}
                         className="w-full h-full object-contain"
                       />
@@ -434,7 +465,7 @@ const Home = () => {
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
                       {laptop.brand || "REFURBISHED"}
                     </p>
-                    <Link to={`/product/${laptop._id}`} className="block group">
+                    <Link to={`/refurbished/${laptop._id}`} className="block group">
                       <h3 className="text-xl font-bold text-black mb-2 hover:underline">
                         {laptop.name}
                       </h3>
@@ -511,7 +542,12 @@ const Home = () => {
                   <Link to={`/mini-pcs/${minipc._id}`} className='block relative border-b-2 border-black overflow-hidden bg-gray-50'>
                     <div className="">
                       <img
-                        src={`http://localhost:4000/uploads/${minipc.image[0].split(/[\\/]/).pop()}`}
+                        src={ minipc.image?.[0]?.startsWith("http")
+                            ? minipc.image[0] // already full URL
+                            : minipc.image?.[0]?.startsWith("uploads")
+                            ? `http://localhost:4000/${minipc.image[0]}` // relative uploads path
+                            : `http://localhost:4000/uploads/${minipc.image?.[0]?.split(/[\\/]/).pop()}` // filename only
+                          }
                         alt={minipc.name}
                         className="w-full h-full object-contain"
                       />
@@ -521,7 +557,7 @@ const Home = () => {
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
                       {minipc.brand || "MINI PC"}
                     </p>
-                    <Link to={`/product/${minipc._id}`} className="block group">
+                    <Link to={`/mini-pcs/${minipc._id}`} className="block group">
                       <h3 className="text-xl font-bold text-black mb-2 hover:underline">
                         {minipc.name}
                       </h3>

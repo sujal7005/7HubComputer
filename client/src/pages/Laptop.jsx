@@ -33,7 +33,19 @@ const Laptop = () => {
 
   // Helper function to get image URL
   const getImageUrl = (imagePath) => {
-    if (!imagePath) return '';
+    if (!imagePath) return "/default-product.png"; // fallback
+
+    // ✅ Case 1: Already full URL (Cloudinary, CDN, etc.)
+    if (imagePath.startsWith("http")) {
+      return imagePath;
+    }
+
+    // ✅ Case 2: Already contains uploads path
+    if (imagePath.startsWith("uploads")) {
+      return `http://localhost:4000/${imagePath}`;
+    }
+
+    // ✅ Case 3: Only filename stored in DB
     const filename = imagePath.split(/[\\/]/).pop();
     return `http://localhost:4000/uploads/${filename}`;
   };
@@ -235,7 +247,7 @@ const Laptop = () => {
                       <div className="aspect-square flex items-center justify-center p-6">
                         <img
                           className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
-                          src={getImageUrl(laptop.image[0])}
+                          src={getImageUrl(laptop?.image?.[0])}
                           alt={laptop.name}
                         />
                       </div>

@@ -33,9 +33,20 @@ const MiniPCs = () => {
 
   // Helper function to get image URL
   const getImageUrl = (imagePath) => {
-    if (!imagePath) return '';
-    const filename = imagePath.split(/[\\/]/).pop();
-    return `http://localhost:4000/uploads/${filename}`;
+    if (!imagePath) return "/placeholder.png";
+
+    // If already full URL (Cloudinary, etc.)
+    if (imagePath.startsWith("http")) {
+      return imagePath;
+    }
+
+    // If backend sends `/uploads/abc.jpg`
+    if (imagePath.startsWith("/")) {
+      return `${BASE_URL}${imagePath}`;
+    }
+
+    // If backend sends only filename
+    return `${BASE_URL}/uploads/${imagePath}`;
   };
 
   // Generate random review count for demo
@@ -202,7 +213,7 @@ const MiniPCs = () => {
                       <div className="aspect-square flex items-center justify-center p-6">
                         <img
                           className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
-                          src={getImageUrl(pc.image[0])}
+                          src={getImageUrl(pc.image?.[0])}
                           alt={pc.name}
                         />
                       </div>
