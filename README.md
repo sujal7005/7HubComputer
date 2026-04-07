@@ -63,7 +63,7 @@ Before running this application, make sure you have the following installed:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/7hub-computer.git
+   git clone https://github.com/sujal7005/7hub-computer.git
    cd 7hub-computer
    ```
 
