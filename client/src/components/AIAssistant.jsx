@@ -20,27 +20,51 @@ import {
   FaTv,
   FaMicrochip,
   FaGamepad,
-  FaServer,
-  FaMemory,
-  FaHdd,
+  FaBoxOpen,
   FaHeadphones, 
   FaEnvelope, 
   FaPhone, 
   FaComments,
-  FaBoxOpen,
-  FaGlobe,
-  FaCircle,
-  FaDotCircle,
   FaUser,
   FaClock,
-  FaCalendarAlt,
   FaTrash,
   FaPlus,
   FaBars,
-  FaEllipsisV
+  FaMagic,
+  FaBrain,
+  // FaWaveform,
+  FaCircle,
+  FaVolumeMute,
+  FaVolumeOff
 } from 'react-icons/fa';
 import { MdSupportAgent } from 'react-icons/md';
 import { BsTicketPerforated } from 'react-icons/bs';
+
+// Alternative icon for waveform (using FaMusic or create custom)
+const FaWaveform = ({ className, size }) => (
+  <svg 
+    className={className} 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <path d="M2 12h2" />
+    <path d="M6 8h2" />
+    <path d="M10 4h2" />
+    <path d="M14 4h2" />
+    <path d="M18 8h2" />
+    <path d="M22 12h2" />
+    <path d="M6 16h2" />
+    <path d="M10 20h2" />
+    <path d="M14 20h2" />
+    <path d="M18 16h2" />
+  </svg>
+);
 
 const AIAssistant = () => {
   const canvasRef = useRef(null);
@@ -48,6 +72,9 @@ const AIAssistant = () => {
   const containerRef = useRef(null);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const sourceRef = useRef(null);
   const navigate = useNavigate();
   
   const { 
@@ -78,6 +105,9 @@ const AIAssistant = () => {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechSynthesisSupported, setSpeechSynthesisSupported] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
 
   const BASE_URL = `http://${window.location.hostname}:4000`;
 
@@ -91,6 +121,13 @@ const AIAssistant = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Check speech synthesis support
+  useEffect(() => {
+    if (!window.speechSynthesis) {
+      setSpeechSynthesisSupported(false);
+    }
+  }, []);
+
   // Load chat history from localStorage on mount
   useEffect(() => {
     const savedChats = localStorage.getItem('chatSessions');
@@ -99,7 +136,6 @@ const AIAssistant = () => {
         const parsed = JSON.parse(savedChats);
         setChatSessions(parsed);
         
-        // Load the most recent session if exists
         if (parsed.length > 0 && !currentSessionId) {
           loadChatSession(parsed[0].id);
         }
@@ -179,6 +215,42 @@ const AIAssistant = () => {
     setShowMobileMenu(false);
   };
 
+  // Text to Speech function
+  const speakText = (text) => {
+    if (!speechSynthesisSupported || isMuted || isLoading) return;
+    
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Stop speaking
+  const stopSpeaking = () => {
+    if (speechSynthesisSupported) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  // Toggle mute
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    if (!isMuted) {
+      stopSpeaking();
+    }
+  };
+
   // Auto-scroll to bottom of messages
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -217,12 +289,15 @@ const AIAssistant = () => {
       if (data.success) {
         setCurrentModel(modelName);
         setShowModelSelector(false);
-        setMessages(prev => [...prev, {
-          text: `Switched to ${modelName} model`,
+        const systemMsg = { 
+          id: Date.now().toString(),
+          text: `Switched to ${modelName} model`, 
           sender: 'system',
           model: modelName,
           timestamp: new Date().toISOString()
-        }]);
+        };
+        setMessages(prev => [...prev, systemMsg]);
+        speakText(`Switched to ${modelName} model`);
       }
     } catch (error) {
       console.error('Error changing model:', error);
@@ -375,6 +450,9 @@ const AIAssistant = () => {
         };
         
         setMessages(prev => [...prev, aiMessage]);
+        
+        // Speak the response (if not muted)
+        speakText(data.reply);
 
         // Save this conversation as a session
         if (messages.length === 0) {
@@ -383,12 +461,16 @@ const AIAssistant = () => {
               title: inputMessage.slice(0, 50) + (inputMessage.length > 50 ? '...' : ''),
               timestamp: new Date().toISOString(),
               lastUpdated: new Date().toISOString(),
-              messages: [...messages, userMessage, aiMessage],
-              messageCount: messages.length + 2,
+              messages: [userMessage, aiMessage],
+              messageCount: 2,
               preview: data.reply.slice(0, 100) + '...',
               recommendedProducts: data.products || []
           };
           saveChatSession(session);
+        } else {
+          // Update existing session
+          const updatedMessages = [...messages, userMessage, aiMessage];
+          updateChatSession(currentSessionId, updatedMessages, data.products);
         }
 
         // Check if products exist and have items
@@ -409,12 +491,15 @@ const AIAssistant = () => {
 
     } catch (error) {
       console.error('Error:', error);
+      const errorMsg = "I'm having trouble connecting. Please check if Ollama is running and try again.";
       setMessages(prev => [...prev, { 
-        text: "I'm having trouble connecting. Please check if Ollama is running and try again.", 
+        id: (Date.now() + 1).toString(),
+        text: errorMsg, 
         sender: 'ai',
         error: true,
         timestamp: new Date().toISOString()
       }]);
+      speakText(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -437,6 +522,12 @@ const AIAssistant = () => {
     if (transcript && !listening) {
       setInputMessage(transcript);
       resetTranscript();
+      // Auto-send after voice input
+      setTimeout(() => {
+        if (transcript.trim()) {
+          sendMessage();
+        }
+      }, 500);
     }
   };
 
@@ -526,6 +617,8 @@ const AIAssistant = () => {
         targetRotationSpeed = 0.015;
       } else if (listening) {
         targetRotationSpeed = 0.008;
+      } else if (isSpeaking) {
+        targetRotationSpeed = 0.012;
       } else {
         targetRotationSpeed = 0.003;
       }
@@ -564,6 +657,8 @@ const AIAssistant = () => {
           pulse = 0.6 + Math.sin(pulsePhase * 4 + dot.phase) * 0.4;
         } else if (listening) {
           pulse = 0.5 + Math.sin(pulsePhase * 2.5 + dot.phase) * 0.3 + audioLevel * 0.4;
+        } else if (isSpeaking) {
+          pulse = 0.5 + Math.sin(pulsePhase * 3 + dot.phase) * 0.35 + (Math.sin(Date.now() * 0.01) * 0.2);
         } else {
           pulse = 0.5 + Math.sin(pulsePhase * 1.2 + dot.phase) * 0.2;
         }
@@ -583,6 +678,8 @@ const AIAssistant = () => {
           color = `rgba(245, 158, 11, ${opacity})`;
         } else if (listening) {
           color = `rgba(139, 92, 246, ${opacity})`;
+        } else if (isSpeaking) {
+          color = `rgba(16, 185, 129, ${opacity})`;
         } else if (isHovering) {
           color = `rgba(59, 130, 246, ${opacity})`;
         } else {
@@ -601,6 +698,9 @@ const AIAssistant = () => {
         } else if (isLoading) {
           ctx.shadowColor = 'rgba(245, 158, 11, 0.5)';
           ctx.shadowBlur = 25;
+        } else if (isSpeaking) {
+          ctx.shadowColor = 'rgba(16, 185, 129, 0.5)';
+          ctx.shadowBlur = 20;
         } else {
           ctx.shadowBlur = 0;
         }
@@ -642,7 +742,7 @@ const AIAssistant = () => {
       canvas.removeEventListener('mousemove', handleMouseMove);
       cancelAnimationFrame(animationFrame);
     };
-  }, [listening, isHovering, audioLevel, isLoading]);
+  }, [listening, isHovering, audioLevel, isLoading, isSpeaking]);
 
   const startListening = () => {
     const token = localStorage.getItem('token');
@@ -671,11 +771,32 @@ const AIAssistant = () => {
     setShowProducts(false);
     setShowSupportOptions(false);
     setCurrentSessionId(null);
+    stopSpeaking();
   };
 
-  // Enhanced ProductCard with animations
+  // Animated Product Card Component
   const ProductCard = ({ product, index }) => {
     const [isHovered, setIsHovered] = useState(false);
+    const [isVisible, setIsVisible] = useState(false);
+    const cardRef = useRef(null);
+    
+    useEffect(() => {
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true);
+            observer.disconnect();
+          }
+        },
+        { threshold: 0.1 }
+      );
+      
+      if (cardRef.current) {
+        observer.observe(cardRef.current);
+      }
+      
+      return () => observer.disconnect();
+    }, []);
     
     const getProductUrl = () => {
       const type = product.type?.toLowerCase() || '';
@@ -702,108 +823,110 @@ const AIAssistant = () => {
       return `${BASE_URL}/uploads/${filename}`;
     };
 
-    useEffect(() => {
-      return () => {
-        setAudioLevel(0);
-        setWaveIntensity(0);
-      };
-    }, []);
-
     return (
-      <Link
-        to={getProductUrl()}
-        className="block transform transition-all duration-500 hover:-translate-y-2"
-        style={{ animationDelay: `${index * 0.1}s` }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+      <div
+        ref={cardRef}
+        className={`transform transition-all duration-700 ${
+          isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+        }`}
+        style={{ transitionDelay: `${index * 0.1}s` }}
       >
-        <div className={`bg-white border-2 rounded-xl overflow-hidden transition-all duration-500 ${
-          isHovered ? 'border-indigo-500 shadow-xl scale-[1.02]' : 'border-gray-200 shadow-md'
-        }`}>
-          <div className="flex flex-col sm:flex-row p-4">
-            {/* Product Image */}
-            <div className="w-full sm:w-24 h-24 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-3 rounded-lg border border-gray-200 mx-auto sm:mx-0 mb-3 sm:mb-0">
-              {getImageUrl() ? (
-                <img 
-                  src={getImageUrl()}
-                  alt={product.name}
-                  className="w-full h-full object-contain transition-transform duration-700"
-                  style={{ transform: isHovered ? 'scale(1.15) rotate(3deg)' : 'scale(1)' }}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div className="text-4xl transition-transform duration-700" 
-                     style={{ transform: isHovered ? 'scale(1.15) rotate(3deg)' : 'scale(1)' }}>
-                  {getProductIcon(product.type)}
-                </div>
-              )}
-            </div>
-            
-            {/* Product Info */}
-            <div className="flex-1 sm:ml-4">
-              <div className="flex flex-col sm:flex-row items-start justify-between gap-2">
-                <div className="flex-1 w-full">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    {product.brand || '7HUB'}
-                  </p>
-                  <h4 className="text-sm font-bold text-gray-900 line-clamp-2">
-                    {product.name}
-                  </h4>
-                </div>
-                {product.rating && (
-                  <div className="flex items-center gap-1 text-amber-500 text-xs flex-shrink-0 self-start">
-                    <FaStar size={10} className="animate-pulse" />
-                    <span className="font-medium">{product.rating}</span>
+        <Link
+          to={getProductUrl()}
+          className="block"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          <div className={`bg-white border-2 rounded-xl overflow-hidden transition-all duration-500 ${
+            isHovered ? 'border-indigo-500 shadow-xl scale-[1.02]' : 'border-gray-200 shadow-md'
+          }`}>
+            <div className="flex flex-col sm:flex-row p-4">
+              {/* Product Image */}
+              <div className={`w-full sm:w-24 h-24 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-3 rounded-lg border border-gray-200 mx-auto sm:mx-0 mb-3 sm:mb-0 transition-all duration-500 ${
+                isHovered ? 'scale-105 rotate-1' : ''
+              }`}>
+                {getImageUrl() ? (
+                  <img 
+                    src={getImageUrl()}
+                    alt={product.name}
+                    className="w-full h-full object-contain transition-transform duration-700"
+                    style={{ transform: isHovered ? 'scale(1.15) rotate(3deg)' : 'scale(1)' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="text-4xl transition-transform duration-700" 
+                       style={{ transform: isHovered ? 'scale(1.15) rotate(3deg)' : 'scale(1)' }}>
+                    {getProductIcon(product.type)}
                   </div>
                 )}
               </div>
               
-              {/* Specs Tags */}
-              <div className="flex flex-wrap gap-1 mt-2">
-                {product.specs?.processor && (
-                  <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100">
-                    {product.specs.processor.split(' ')[0]}
-                  </span>
-                )}
-                {product.specs?.ram && (
-                  <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100">
-                    {product.specs.ram}
-                  </span>
-                )}
-                {product.specs?.storage && (
-                  <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100">
-                    {product.specs.storage}
-                  </span>
-                )}
-              </div>
-              
-              {/* Price */}
-              <div className="flex items-center justify-between mt-3">
-                <div className="relative">
-                  <span className="text-lg font-bold text-gray-900">
-                    {formatPrice(product.price)}
-                  </span>
-                  {product.originalPrice && product.originalPrice > product.price && (
-                    <span className="text-xs text-gray-400 line-through ml-2 absolute -top-4 right-0">
-                      {formatPrice(product.originalPrice)}
+              {/* Product Info */}
+              <div className="flex-1 sm:ml-4">
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-2">
+                  <div className="flex-1 w-full">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {product.brand || '7HUB'}
+                    </p>
+                    <h4 className="text-sm font-bold text-gray-900 line-clamp-2">
+                      {product.name}
+                    </h4>
+                  </div>
+                  {product.rating && (
+                    <div className="flex items-center gap-1 text-amber-500 text-xs flex-shrink-0 self-start">
+                      <FaStar size={10} className={isHovered ? 'animate-pulse' : ''} />
+                      <span className="font-medium">{product.rating}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Specs Tags */}
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {product.specs?.processor && (
+                    <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100">
+                      {product.specs.processor.split(' ')[0]}
+                    </span>
+                  )}
+                  {product.specs?.ram && (
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100">
+                      {product.specs.ram}
+                    </span>
+                  )}
+                  {product.specs?.storage && (
+                    <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100">
+                      {product.specs.storage}
                     </span>
                   )}
                 </div>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-all duration-300 ${
-                  product.inStock 
-                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
-                    : 'bg-rose-100 text-rose-700 border border-rose-200'
-                }`}>
-                  {product.inStock ? 'In Stock' : 'Out of Stock'}
-                </span>
+                
+                {/* Price */}
+                <div className="flex items-center justify-between mt-3">
+                  <div className="relative">
+                    <span className="text-lg font-bold text-gray-900">
+                      {formatPrice(product.price)}
+                    </span>
+                    {product.originalPrice && product.originalPrice > product.price && (
+                      <span className="text-xs text-gray-400 line-through ml-2 absolute -top-4 right-0">
+                        {formatPrice(product.originalPrice)}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-all duration-300 ${
+                    product.inStock 
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
+                      : 'bg-rose-100 text-rose-700 border border-rose-200'
+                  }`}>
+                    {product.inStock ? 'In Stock' : 'Out of Stock'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </Link>
+        </Link>
+      </div>
     );
   };
 
@@ -844,7 +967,23 @@ const AIAssistant = () => {
           </button>
           
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* New Chat Button - Hidden on mobile, shown in mobile menu */}
+            {/* Mute/Unmute Button */}
+            <button
+              onClick={toggleMute}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-1 text-xs sm:text-sm ${
+                isMuted 
+                  ? 'bg-gray-100 border-2 border-gray-300 text-gray-500'
+                  : isSpeaking 
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white animate-pulse'
+                    : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-emerald-500'
+              }`}
+              title={isMuted ? "Unmute voice" : "Mute voice"}
+            >
+              {isMuted ? <FaVolumeOff size={12} /> : <FaVolumeUp size={12} />}
+              <span className="hidden sm:inline">{isMuted ? 'Unmute' : 'Mute'}</span>
+            </button>
+            
+            {/* New Chat Button */}
             <button
               onClick={startNewChat}
               className="hidden sm:flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-xl transform hover:-translate-y-1 text-xs sm:text-sm"
@@ -862,7 +1001,7 @@ const AIAssistant = () => {
               <span className="text-xs text-gray-700">Menu</span>
             </button>
             
-            {/* Chat History Button - Desktop */}
+            {/* Chat History Button */}
             <div className="relative hidden sm:block">
               <button
                 onClick={() => setShowChatHistory(!showChatHistory)}
@@ -944,7 +1083,7 @@ const AIAssistant = () => {
                 onClick={() => setShowModelSelector(!showModelSelector)}
                 className="flex items-center gap-2 px-3 sm:px-5 py-1.5 sm:py-2.5 bg-white border-2 border-gray-200 rounded-full hover:border-indigo-500 transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-1 text-xs sm:text-sm"
               >
-                <span className="text-gray-600 hidden sm:inline">Model:</span>
+                <FaBrain className="text-gray-600" size={12} />
                 <span className="font-semibold text-indigo-600">{currentModel}</span>
                 <FaChevronDown size={10} className={`text-gray-500 transition-transform duration-300 ${showModelSelector ? 'rotate-180' : ''}`} />
               </button>
@@ -976,7 +1115,7 @@ const AIAssistant = () => {
               </div>
             </div>
 
-            {/* Status indicator - Hidden on mobile */}
+            {/* Status indicator */}
             <div className="hidden sm:flex items-center gap-2 px-3 sm:px-5 py-1.5 sm:py-2.5 bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-full">
               <div className="relative">
                 <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-emerald-500 rounded-full animate-pulse"></div>
@@ -1000,6 +1139,18 @@ const AIAssistant = () => {
               >
                 <FaPlus size={14} />
                 <span className="text-sm">New Chat</span>
+              </button>
+              
+              <button
+                onClick={toggleMute}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
+                  isMuted 
+                    ? 'bg-gray-100 border-2 border-gray-300 text-gray-500'
+                    : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-emerald-500'
+                }`}
+              >
+                {isMuted ? <FaVolumeOff size={14} /> : <FaVolumeUp size={14} />}
+                <span className="text-sm">{isMuted ? 'Unmute Voice' : 'Mute Voice'}</span>
               </button>
               
               <button
@@ -1151,6 +1302,7 @@ const AIAssistant = () => {
               <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 sm:w-48 h-32 sm:h-48 rounded-full transition-all duration-700 ${
                 isLoading ? 'bg-amber-400/10 blur-3xl scale-150 animate-pulse' :
                 listening ? 'bg-indigo-400/10 blur-3xl scale-150 animate-pulse' : 
+                isSpeaking ? 'bg-emerald-400/10 blur-3xl scale-150 animate-pulse' :
                 'bg-blue-400/5 blur-2xl'
               }`} />
               
@@ -1159,6 +1311,7 @@ const AIAssistant = () => {
                 <div className={`inline-flex px-3 sm:px-6 py-1.5 sm:py-3 rounded-full text-[10px] sm:text-sm font-medium border-2 transition-all duration-500 bg-white shadow-lg ${
                   isLoading ? 'border-amber-400 text-amber-700' :
                   listening ? 'border-indigo-400 text-indigo-700' : 
+                  isSpeaking ? 'border-emerald-400 text-emerald-700 animate-pulse' :
                   'border-gray-200 text-gray-600'
                 }`}>
                   <span className="flex items-center gap-1 sm:gap-2">
@@ -1174,6 +1327,11 @@ const AIAssistant = () => {
                           <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-indigo-500"></span>
                         </span>
                         <span className="animate-pulse">LISTENING</span>
+                      </>
+                    ) : isSpeaking ? (
+                      <>
+                        <FaWaveform className="text-emerald-500 animate-pulse" size={12} />
+                        <span className="animate-pulse">SPEAKING</span>
                       </>
                     ) : (
                       <>
@@ -1218,8 +1376,19 @@ const AIAssistant = () => {
               </div>
               <div className="flex-1">
                 <h2 className="text-xl sm:text-3xl font-light text-gray-900">AI Assistant</h2>
-                <p className="text-xs sm:text-sm text-gray-600">Ask me anything</p>
+                <p className="text-xs sm:text-sm text-gray-600">Ask me anything about our products</p>
               </div>
+              {isSpeaking && !isMuted && (
+                <div className="flex items-center gap-1">
+                  <FaWaveform className="text-emerald-500 animate-pulse" size={16} />
+                  <button
+                    onClick={stopSpeaking}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Stop
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Product Recommendations */}
@@ -1227,19 +1396,17 @@ const AIAssistant = () => {
               <div className="bg-white border-2 border-indigo-200 rounded-2xl p-3 sm:p-4 shadow-lg animate-fadeInUp">
                 <div className="flex items-center justify-between mb-2 sm:mb-3">
                   <h3 className="text-sm sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <FaRobot className="text-indigo-600 animate-spin-slow" size={16} />
-                    Recommended
+                    <FaMagic className="text-indigo-600 animate-spin-slow" size={16} />
+                    Recommended for You
                   </h3>
-                  <span className="text-[10px] sm:text-xs text-indigo-600 bg-indigo-50 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-indigo-200">
-                    {recommendedProducts.length}
+                  <span className="text-[10px] sm:text-xs text-indigo-600 bg-indigo-50 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-indigo-200 animate-pulse">
+                    {recommendedProducts.length} items
                   </span>
                 </div>
                 
                 <div className="space-y-2 sm:space-y-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
                   {recommendedProducts.map((product, index) => (
-                    <div key={index} className="animate-slideInUp" style={{ animationDelay: `${index * 0.1}s` }}>
-                      <ProductCard product={product} index={index} />
-                    </div>
+                    <ProductCard key={index} product={product} index={index} />
                   ))}
                 </div>
               </div>
@@ -1255,17 +1422,17 @@ const AIAssistant = () => {
                   <div className="h-full flex flex-col items-center justify-center text-center py-6 sm:py-12 animate-fadeIn">
                     <div className="text-4xl sm:text-7xl mb-2 sm:mb-4 text-gray-300 animate-bounce">✨</div>
                     <p className="text-sm sm:text-lg text-gray-600">Start a conversation</p>
-                    <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2 animate-pulse">Tap the globe and speak</p>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2 animate-pulse">Tap the globe and speak or type below</p>
                   </div>
                 ) : (
                   <>
-                    {messages.map((msg) => (
+                    {messages.map((msg, idx) => (
                       <div
-                        key={msg.id}
+                        key={msg.id || idx}
                         className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-slideIn${
                           msg.sender === 'user' ? 'Right' : 'Left'
                         }`}
-                        style={{ animationDelay: `${messages.indexOf(msg) * 0.05}s` }}
+                        style={{ animationDelay: `${idx * 0.05}s` }}
                       >
                         <div
                           className={`max-w-[90%] sm:max-w-[85%] rounded-xl sm:rounded-2xl p-2 sm:p-4 transition-all duration-300 hover:shadow-lg ${
@@ -1425,7 +1592,7 @@ const AIAssistant = () => {
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 animate-fadeInUp">
                 <h3 className="text-sm sm:text-lg font-semibold text-blue-700 mb-2 sm:mb-3 flex items-center gap-2">
                   <FaHeadphones className="text-blue-600 animate-pulse" size={16} />
-                  Support
+                  Need Help?
                 </h3>
 
                 <div className="grid grid-cols-2 gap-2 sm:gap-3">
@@ -1461,6 +1628,85 @@ const AIAssistant = () => {
           </div>
         </div>
       </div>
+
+      {/* Add custom styles */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes fadeInDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        
+        .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
+        .animate-fadeInDown { animation: fadeInDown 0.6s ease-out; }
+        .animate-fadeInUp { animation: fadeInUp 0.6s ease-out; }
+        .animate-slideInLeft { animation: slideInLeft 0.5s ease-out; }
+        .animate-slideInRight { animation: slideInRight 0.5s ease-out; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #c7d2fe;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #818cf8;
+        }
+      `}</style>
     </div>
   );
 };

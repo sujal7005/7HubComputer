@@ -5,9 +5,11 @@ import axios from 'axios';
 import { FaCreditCard, FaGooglePay, FaPhone, FaMoneyBill, FaArrowLeft, FaArrowRight, FaCheck, FaTag } from 'react-icons/fa';
 import { SiPaytm, SiPaypal, SiRazorpay } from 'react-icons/si';
 
+const BASE_URL = `http://${window.location.hostname}:4000`;
+
 const Payment = () => {
   const location = useLocation();
-  const product = location.state?.product; // Retrieve product data from Cart
+  const product = location.state?.product;
   const { cart } = useContext(CartContext);
   const [quantity, setQuantity] = useState(product?.quantity || 1);
   const [step, setStep] = useState(1);
@@ -47,7 +49,60 @@ const Payment = () => {
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const [razorpayOrder, setRazorpayOrder] = useState(null);
 
-  const BASE_URL = `http://${window.location.hostname}:4000`;
+  // Helper function to get image URL dynamically
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('data:')) return imagePath;
+    
+    // Handle different path formats
+    const filename = imagePath.split(/[\\/]/).pop();
+    return `${BASE_URL}/uploads/${filename}`;
+  };
+
+  // Helper function to get the main product image
+  const getProductImage = (product) => {
+    if (!product) return '';
+    
+    // If product has images array
+    if (product.images && product.images.length > 0) {
+      return getImageUrl(product.images[0]);
+    }
+    
+    // If product has image array
+    if (product.image && product.image.length > 0) {
+      return getImageUrl(product.image[0]);
+    }
+    
+    // If product has single image field
+    if (product.imageUrl) {
+      return getImageUrl(product.imageUrl);
+    }
+    
+    // Fallback placeholder image
+    return '/api/placeholder/200/200';
+  };
+
+  // Helper function to get all product images
+  const getAllProductImages = (product) => {
+    if (!product) return [];
+    
+    const images = [];
+    
+    if (product.images && Array.isArray(product.images)) {
+      images.push(...product.images.map(img => getImageUrl(img)));
+    }
+    
+    if (product.image && Array.isArray(product.image)) {
+      images.push(...product.image.map(img => getImageUrl(img)));
+    }
+    
+    if (product.imageUrl && !images.includes(getImageUrl(product.imageUrl))) {
+      images.push(getImageUrl(product.imageUrl));
+    }
+    
+    return images.length > 0 ? images : ['/api/placeholder/200/200'];
+  };
 
   useEffect(() => {
     const loggedInUserId = localStorage.getItem('user');
@@ -75,7 +130,6 @@ const Payment = () => {
   useEffect(() => {
     if (paypalLoaded && paymentMethod === 'paypal' && step === 3 && userWithUserId?.userId) {
       console.log('Auto-initializing PayPal with user:', userWithUserId);
-      // Small delay to ensure DOM is ready
       setTimeout(() => {
         initializePayPalButtons(userWithUserId);
       }, 100);
@@ -98,7 +152,6 @@ const Payment = () => {
 
         const addressResponse = await axios.get(`${BASE_URL}/api/users/${userId}/addresses`);
         const addresses = addressResponse.data;
-        // console.log('User addresses:', addresses);
 
         setUserDetails((prev) => ({
           ...prev,
@@ -126,7 +179,6 @@ const Payment = () => {
   }, []);
 
   useEffect(() => {
-    // If the product is from the cart, update the quantity from the cart
     if (Array.isArray(cartItems) && cartItems.length > 0) {
       const cartProduct = cart.find((item) => item._id === product._id);
       if (cartProduct) {
@@ -154,7 +206,6 @@ const Payment = () => {
       basePrice -= discountAmount;
     }
   
-    // Adding selected options if available
     let ramPrice = selectedRam ? selectedRam.price : product?.specs?.ramOptions?.[0]?.price || 0;
     let storage1Price = selectedStorage1 ? selectedStorage1.price : product?.specs?.storage1Options?.[0]?.price || 0;
     let storage2Price = selectedStorage2 ? selectedStorage2.price : product?.specs?.storage2Options?.[0]?.price || 0;
@@ -168,13 +219,11 @@ const Payment = () => {
 
   const handleNextStep = () => {
     if (step === 1) {
-      // Validate user details before proceeding
       if (!userDetails.name || !userDetails.email || !userDetails.phoneNumber || !userDetails.address?.line1) {
         alert('Please fill in all user details.');
         return;
       }
     } else if (step === 2) {
-      // Validate payment method
       if (!paymentMethod) {
         alert('Please select a payment method.');
         return;
@@ -189,7 +238,6 @@ const Payment = () => {
 
   const handlePreviousStep = () => setStep((prevStep) => Math.max(prevStep - 1, 1));
 
-    // Load Razorpay script
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
       if (window.Razorpay) {
@@ -214,7 +262,6 @@ const Payment = () => {
     });
   };
 
-  // Handle Razorpay Payment
   const handleRazorpayPayment = async () => {
     if (!userWithUserId?.userId) {
       setPaymentStatus({ error: 'User information is missing', success: '' });
@@ -225,12 +272,10 @@ const Payment = () => {
     setPaymentStatus({ error: '', success: 'Creating order...' });
 
     try {
-      // Load Razorpay script if not loaded
       if (!razorpayLoaded) {
         await loadRazorpayScript();
       }
 
-      // Create order on backend
       const response = await fetch(`${BASE_URL}/api/create-razorpay-order`, {
         method: 'POST',
         headers: {
@@ -255,17 +300,15 @@ const Payment = () => {
 
       setRazorpayOrder(data);
 
-      // Razorpay options
       const options = {
         key: data.keyId,
         amount: data.amount,
         currency: data.currency,
         name: '7HubComputer',
         description: product.name,
-        image: 'https://your-logo-url.com/logo.png', // Add your logo URL
+        image: getProductImage(product), // Using dynamic image
         order_id: data.razorpayOrderId,
         handler: async (response) => {
-          // Verify payment
           const verifyResponse = await fetch(`${BASE_URL}/api/verify-razorpay-payment`, {
             method: 'POST',
             headers: {
@@ -313,7 +356,6 @@ const Payment = () => {
         }
       };
 
-      // Open Razorpay checkout
       const razorpayInstance = new window.Razorpay(options);
       razorpayInstance.open();
 
@@ -353,7 +395,6 @@ const Payment = () => {
       return;
     }
 
-    // Handle Razorpay methods
     const razorpayMethods = ['creditCard', 'gpay', 'phonepay', 'netbanking'];
     
     if (razorpayMethods.includes(paymentMethod)) {
@@ -371,7 +412,6 @@ const Payment = () => {
       cashOnDelivery: '/api/cash-on-delivery',
     };
 
-    // For PayPal, we don't want to process here - it will be handled separately
     if (paymentMethod === 'paypal') {
       handlePayPalPayment(userWithUserId);
       return;
@@ -403,15 +443,12 @@ const Payment = () => {
       console.log('Payment response:', data);
     
       if (response.ok) {
-        // Handle Paytm redirect specially
         if (paymentMethod === 'paytm' && data.paytmParams) {
-          // Create a form to submit to Paytm
           const form = document.createElement('form');
           form.method = 'POST';
           form.action = data.paytmUrl;
-          form.target = '_blank'; // Open in new tab
+          form.target = '_blank';
           
-          // Add Paytm parameters as hidden inputs
           Object.keys(data.paytmParams).forEach(key => {
             const input = document.createElement('input');
             input.type = 'hidden';
@@ -429,7 +466,6 @@ const Payment = () => {
             error: '' 
           });
         } else {
-          // For other payment methods
           setPaymentStatus({ success: 'Payment successful!', error: '' });
           setTimeout(() => navigate('/profile'), 2000);
         }
@@ -469,7 +505,6 @@ const Payment = () => {
   const initializePayPalButtons = (userData) => {
     console.log('Initializing PayPal buttons with user:', userData);
     
-    // Clear any existing buttons
     const container = document.getElementById('paypal-button-container');
     if (container) {
       container.innerHTML = '';
@@ -481,7 +516,6 @@ const Payment = () => {
     }
 
     window.paypal.Buttons({
-      // Set up the transaction
       createOrder: (data, actions) => {
         const inrAmount = (calculateTotalPrice() / 83).toFixed(2);
 
@@ -498,7 +532,7 @@ const Payment = () => {
           application_context: {
           brand_name: '7HubComputer',
           landing_page: 'BILLING',
-          shipping_preference: 'NO_SHIPPING', // Since you already collect address
+          shipping_preference: 'NO_SHIPPING',
           user_action: 'PAY_NOW',
           return_url: `${window.location.origin}/payment/success`,
           cancel_url: `${window.location.origin}/payment/cancel`
@@ -557,7 +591,6 @@ const Payment = () => {
     setPaymentStatus({ error: '', success: 'Initializing PayPal...' });
 
     try {
-      // Create order on backend
       const response = await fetch(`${BASE_URL}/api/create-paypal-order`, {
         method: 'POST',
         headers: {
@@ -582,11 +615,9 @@ const Payment = () => {
         throw new Error(data.error || 'Failed to create PayPal order');
       }
 
-      // If PayPal SDK is already loaded, initialize buttons
       if (window.paypal) {
         initializePayPalButtons(userWithUserId);
       } else {
-        // If not loaded, load it first
         await loadPayPalScript();
         initializePayPalButtons(userWithUserId);
       }
@@ -628,7 +659,6 @@ const Payment = () => {
     setQuantity(newQuantity > 0 ? newQuantity : 1);
   };
 
-  // Function to apply discount dynamically
   const applyDiscount = async () => {
     if (discountCode.trim() === "") {
       setDiscountError("Please enter a discount code.");
@@ -662,7 +692,6 @@ const Payment = () => {
     }
   };
 
-  // Payment method icons mapping
   const paymentIcons = {
     creditCard: <FaCreditCard className="text-xl" />,
     gpay: <FaGooglePay className="text-xl" />,
@@ -672,6 +701,30 @@ const Payment = () => {
     netbanking: <FaMoneyBill className="text-xl" />,
     cashOnDelivery: <FaMoneyBill className="text-xl" />,
     razorpay: <SiRazorpay className="text-xl" />
+  };
+
+  // Image Error Handler Component
+  const ImageWithFallback = ({ src, alt, className, ...props }) => {
+    const [imgSrc, setImgSrc] = useState(src);
+    const [error, setError] = useState(false);
+
+    const handleError = () => {
+      if (!error) {
+        setError(true);
+        setImgSrc('/api/placeholder/200/200');
+      }
+    };
+
+    return (
+      <img
+        {...props}
+        src={imgSrc}
+        alt={alt}
+        className={className}
+        onError={handleError}
+        loading="lazy"
+      />
+    );
   };
 
   return (
@@ -709,15 +762,15 @@ const Payment = () => {
           </div>
         )}
 
-        {/* Product Summary */}
+        {/* Product Summary with Dynamic Images */}
         {product && (
           <div className="border-4 border-black bg-white p-6 mb-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
             <div className="flex flex-col md:flex-row gap-6 items-center">
               
-              {/* Product Image */}
+              {/* Product Image - Using dynamic image handler */}
               <div className="md:w-1/3 border-2 border-black p-4 bg-gray-50">
-                <img
-                  src={`${BASE_URL}/uploads/${product.image[0].split(/[\\/]/).pop()}`}
+                <ImageWithFallback
+                  src={getProductImage(product)}
                   alt={product.name}
                   className="w-full h-40 object-contain"
                 />
@@ -754,6 +807,24 @@ const Payment = () => {
                     </select>
                   </div>
                 </div>
+
+                {/* Additional Product Images Gallery (Optional) */}
+                {getAllProductImages(product).length > 1 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-bold text-gray-600 mb-2">More Images:</p>
+                    <div className="flex gap-2">
+                      {getAllProductImages(product).slice(0, 3).map((img, idx) => (
+                        <div key={idx} className="w-12 h-12 border border-gray-300 p-1">
+                          <ImageWithFallback
+                            src={img}
+                            alt={`${product.name} view ${idx + 1}`}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {discountApplied && (
                   <p className="text-green-600 font-bold mt-2 flex items-center gap-2">

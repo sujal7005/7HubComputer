@@ -7,31 +7,31 @@ const checkpoints = [
     title: "Hardware Inspection",
     description:
       "We inspect every hardware component to ensure it meets industry standards and is free of defects. This includes checking the motherboard, CPU, GPU, RAM, storage, and power supply for any potential issues.",
-    image: "/images/hardware-inspection.jpg",
+    image: "https://static.vecteezy.com/system/resources/previews/003/313/682/large_2x/service-center-repair-inspection-replacement-laptop-motherboard-photo.JPG",
   },
   {
     title: "Software & OS Check",
     description:
       "All necessary drivers, operating system updates, and essential software are pre-installed and tested for stability, ensuring a seamless user experience right out of the box.",
-    image: "/images/software-check.jpg",
+    image: "https://preview.gato.txst.edu/.asset/172952/w/2000/6U5V-KnJH98l/oscheck3.png",
   },
   {
     title: "Performance Benchmarking",
     description:
       "We run a series of benchmark tests to measure system performance, stress-test the CPU and GPU, and ensure that the system operates at peak efficiency.",
-    image: "/images/performance-benchmark.jpg",
+    image: "https://www.outrightcrm.com/wp-content/uploads/2025/07/laptop-speed-test2.jpg",
   },
   {
     title: "Cooling System Analysis",
     description:
       "Proper cooling is essential for long-term performance. We analyze the airflow, test fan speeds, and measure CPU/GPU temperatures under load to prevent overheating.",
-    image: "/images/cooling-system.jpg",
+    image: "https://www.simscale.com/forum/uploads/default/original/3X/6/8/688e30dab0b9ba68dd7d3253e6e8d6749bac918a.png",
   },
   {
     title: "Storage & Memory Testing",
     description:
       "We check the read/write speeds of storage drives and conduct RAM stability tests to ensure fast, error-free operation under various workloads.",
-    image: "/images/storage-memory.jpg",
+    image: "https://www.wikihow.com/images/thumb/a/a5/Check-Your-Computer%27s-Memory-Step-14.jpg/v4-1200px-Check-Your-Computer%27s-Memory-Step-14.jpg",
   },
   {
     title: "Connectivity & Ports Check",

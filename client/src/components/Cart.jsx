@@ -40,6 +40,7 @@ const Cart = () => {
   // Helper function to get image URL
   const getImageUrl = (imagePath) => {
     if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
     const filename = imagePath.split(/[\\/]/).pop();
     return `${BASE_URL}/uploads/${filename}`;
   };
