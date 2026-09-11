@@ -193,6 +193,7 @@ This project is licensed under the ISC License - see the [LICENSE](LICENSE) file
 
 - **Project Link**: [https://github.com/sujal7005/7hub-computer](https://github.com/sujal7005/7hub-computer)
 - **Email**: sujal0705gupta@gmail.com
+- **Email**: prabhatmatho1@gmail.com
 
 ## 🙏 Acknowledgments
 
